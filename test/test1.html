@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Copper Music</title>
+
+  <link
+    rel="icon"
+    type="image/png"
+    href="https://cdn.modrinth.com/data/bNbuiFhn/04c05f153934be4a5146ebf1fb92749ba20490ea.png"
+  />
+  <style>
+    body {
+      background: #2a1e16;
+      color: #c77b47;
+      font-family: sans-serif;
+      padding: 20px;
+    }
+
+    h1 {
+      color: #e0a96d;
+    }
+
+    button {
+      background: linear-gradient(145deg, #c07a3a, #8f4b21);
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      opacity: 0.85;
+    }
+
+    .controls button {
+      margin-right: 6px;
+    }
+
+    .section {
+      margin-top: 15px;
+    }
+
+    #progressContainer {
+      width: 100%;
+      height: 8px;
+      background: #5c3a24;
+      border-radius: 4px;
+      margin: 10px 0;
+      cursor: pointer;
+    }
+
+    #progressBar {
+      height: 100%;
+      width: 0%;
+      background: #e0a96d;
+      border-radius: 4px;
+    }
+
+    #queue {
+      margin-top: 15px;
+      list-style: none;
+      padding: 0;
+    }
+
+    #queue li {
+      cursor: pointer;
+      padding: 4px;
+    }
+
+    #queue li:hover {
+      background: #3b2a1f;
+    }
+
+  </style>
+</head>
+<body>
+
+  <h1>Copper Music</h1>
+
+  <input type="file" id="fileInput" multiple accept="audio/*" />
+
+  <div id="nowPlaying">Nothing playing</div>
+
+  <audio id="audio"></audio>
+
+  <!-- Progress bar -->
+  <div id="progressContainer">
+    <div id="progressBar"></div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <button id="play">Play</button>
+    <button id="pause">Pause</button>
+    <button id="next">Next</button>
+  </div>
+
+  <!-- Crossfader -->
+  <div class="section">
+    <label>Crossfader: <span id="crossValue">0%</span></label>
+    <input type="range" id="crossfader" min="0" max="100" value="0">
+    <button id="resetCrossfade">Reset Crossfade</button>
+  </div>
+
+  <!-- EQ -->
+  <div class="section">
+    <h3>EQ</h3>
+
+    <div>
+      <label>Bass</label>
+      <input type="range" class="eqSlider" min="-20" max="20" value="0" data-band="0" data-value-id="eq0">
+      <span id="eq0">0 dB</span>
+    </div>
+
+    <div>
+      <label>Mid</label>
+      <input type="range" class="eqSlider" min="-20" max="20" value="0" data-band="1" data-value-id="eq1">
+      <span id="eq1">0 dB</span>
+    </div>
+
+    <div>
+      <label>Treble</label>
+      <input type="range" class="eqSlider" min="-20" max="20" value="0" data-band="2" data-value-id="eq2">
+      <span id="eq2">0 dB</span>
+    </div>
+
+    <button id="resetEQ">Reset EQ</button>
+  </div>
+
+  <!-- Queue -->
+  <ul id="queue"></ul>
+
+  <script>
+    const fileInput = document.getElementById("fileInput");
+    const audioA = document.getElementById("audio");
+    const audioB = document.createElement("audio");
+    const queueEl = document.getElementById("queue");
+    const nowPlaying = document.getElementById("nowPlaying");
+
+    const progressContainer = document.getElementById("progressContainer");
+    const progressBar = document.getElementById("progressBar");
+
+    const playBtn = document.getElementById("play");
+    const pauseBtn = document.getElementById("pause");
+    const nextBtn = document.getElementById("next");
+
+    let songs = [];
+    let currentIndex = 0;
+
+    // ---- AUDIO CONTEXT ----
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    const sourceA = audioCtx.createMediaElementSource(audioA);
+    const sourceB = audioCtx.createMediaElementSource(audioB);
+
+    const gainA = audioCtx.createGain();
+    const gainB = audioCtx.createGain();
+
+    // EQ
+    const eqBands = [
+      audioCtx.createBiquadFilter(),
+      audioCtx.createBiquadFilter(),
+      audioCtx.createBiquadFilter()
+    ];
+
+    eqBands[0].type = "lowshelf";
+    eqBands[1].type = "peaking";
+    eqBands[2].type = "highshelf";
+
+    eqBands.forEach(eq => eq.gain.value = 0);
+
+    sourceA.connect(eqBands[0]);
+    eqBands[0].connect(eqBands[1]);
+    eqBands[1].connect(eqBands[2]);
+    eqBands[2].connect(gainA).connect(audioCtx.destination);
+
+    sourceB.connect(gainB).connect(audioCtx.destination);
+
+    gainA.gain.value = 1;
+    gainB.gain.value = 0;
+
+    let activeAudio = audioA;
+    let inactiveAudio = audioB;
+
+    // ---- LOAD FILES ----
+    fileInput.addEventListener("change", () => {
+      songs = Array.from(fileInput.files);
+      renderQueue();
+      loadTrack(0);
+    });
+
+    // ---- QUEUE ----
+    function renderQueue() {
+      queueEl.innerHTML = "";
+      songs.forEach((song, i) => {
+        const li = document.createElement("li");
+        li.textContent = song.name;
+        li.onclick = () => loadTrack(i);
+        queueEl.appendChild(li);
+      });
+    }
+
+    // ---- PLAYBACK ----
+    function loadTrack(index) {
+      currentIndex = index;
+      activeAudio.src = URL.createObjectURL(songs[index]);
+      activeAudio.load();
+      activeAudio.pause();
+      nowPlaying.textContent = songs[index].name;
+
+      preloadNext();
+    }
+
+    function preloadNext() {
+      const next = (currentIndex + 1) % songs.length;
+      inactiveAudio.src = URL.createObjectURL(songs[next]);
+      inactiveAudio.load();
+    }
+
+    function swapTracks() {
+      [activeAudio, inactiveAudio] = [inactiveAudio, activeAudio];
+      [gainA.gain.value, gainB.gain.value] = [1, 0];
+    }
+
+    activeAudio.addEventListener("ended", () => {
+      inactiveAudio.play();
+      swapTracks();
+      currentIndex = (currentIndex + 1) % songs.length;
+      nowPlaying.textContent = songs[currentIndex].name;
+      preloadNext();
+    });
+
+    // ---- CONTROLS ----
+    playBtn.onclick = () => {
+      audioCtx.resume();
+      activeAudio.play();
+    };
+
+    pauseBtn.onclick = () => activeAudio.pause();
+
+    nextBtn.onclick = () => {
+      activeAudio.pause();
+      inactiveAudio.play();
+      swapTracks();
+      currentIndex = (currentIndex + 1) % songs.length;
+      nowPlaying.textContent = songs[currentIndex].name;
+      preloadNext();
+    };
+
+    // ---- PROGRESS BAR ----
+    activeAudio.addEventListener("timeupdate", () => {
+      if (!activeAudio.duration) return;
+      progressBar.style.width =
+        (activeAudio.currentTime / activeAudio.duration) * 100 + "%";
+    });
+
+    progressContainer.onclick = e => {
+      const rect = progressContainer.getBoundingClientRect();
+      const percent = (e.clientX - rect.left) / rect.width;
+      activeAudio.currentTime = percent * activeAudio.duration;
+    };
+
+    // ---- CROSSFADER ----
+    const crossfader = document.getElementById("crossfader");
+    const crossText = document.getElementById("crossValue");
+
+    crossfader.oninput = () => {
+      const x = crossfader.value / 100;
+      gainA.gain.value = Math.cos(x * Math.PI * 0.5);
+      gainB.gain.value = Math.cos((1 - x) * Math.PI * 0.5);
+      crossText.textContent = crossfader.value + "%";
+    };
+
+    document.getElementById("resetCrossfade").onclick = () => {
+      crossfader.value = 0;
+      gainA.gain.value = 1;
+      gainB.gain.value = 0;
+      crossText.textContent = "0%";
+    };
+
+    // ---- EQ ----
+    document.querySelectorAll(".eqSlider").forEach(slider => {
+      const band = Number(slider.dataset.band);
+      const label = document.getElementById(slider.dataset.valueId);
+
+      slider.oninput = () => {
+        eqBands[band].gain.value = slider.value;
+        label.textContent = slider.value + " dB";
+      };
+    });
+
+    document.getElementById("resetEQ").onclick = () => {
+      document.querySelectorAll(".eqSlider").forEach(slider => {
+        slider.value = 0;
+        eqBands[slider.dataset.band].gain.value = 0;
+        document.getElementById(slider.dataset.valueId).textContent = "0 dB";
+      });
+    };
+
+  </script>
+</body>
+</html>
