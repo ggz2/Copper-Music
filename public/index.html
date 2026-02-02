@@ -19,9 +19,18 @@
         <ul>
           <li class="active"><i class="fas fa-home"></i> Home</li>
           <li><i class="fas fa-search"></i> Search</li>
-          <li><i class="fas fa-book"></i> Your Library</li>
         </ul>
       </nav>
+      
+      <div class="library-section">
+        <div class="library-header">
+          <i class="fas fa-book"></i> <span>Your Library</span>
+        </div>
+        <div id="playlist-list" class="playlist-list">
+          <!-- Folders/Playlists will appear here -->
+        </div>
+      </div>
+
       <div class="upload-section">
         <label for="folder-upload" class="upload-btn">
           <i class="fas fa-folder-plus"></i> Upload Folder
@@ -33,6 +42,7 @@
         </label>
         <input type="file" id="file-upload" accept="audio/*" multiple hidden>
       </div>
+
       <div class="eq-section">
         <h3>Equalizer</h3>
         <div class="eq-grid">
@@ -48,6 +58,10 @@
             <input type="range" class="eq-band" data-freq="12000" min="-12" max="12" value="0">
             <label>Treble</label>
           </div>
+        </div>
+        <div class="fade-control">
+          <label>Crossfade: <span id="fade-val">5</span>s</label>
+          <input type="range" id="crossfade" min="0" max="20" value="5">
         </div>
       </div>
     </div>

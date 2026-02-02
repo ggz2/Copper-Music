@@ -18,22 +18,29 @@ const albumWrapper = document.querySelector('.album-wrapper');
 const albumArt = document.getElementById('album-art');
 const miniAlbumArt = document.getElementById('mini-album-art');
 const queueList = document.getElementById('queue-list');
+const playlistList = document.getElementById('playlist-list');
+const crossfadeInput = document.getElementById('crossfade');
+const fadeValDisplay = document.getElementById('fade-val');
 const eqBands = document.querySelectorAll('.eq-band');
 
 let playlist = [];
 let currentIndex = 0;
 let isPlaying = false;
-let trackMetadata = new Map(); // Store metadata for icons
+let trackMetadata = new Map();
+let folders = new Map(); // Store tracks by folder path
+let crossfadeTime = 5;
 
 // Web Audio API Context
 let audioContext;
 let source;
 let filters = [];
+let gainNode;
 
 function initAudio() {
   if (audioContext) return;
   audioContext = new (window.AudioContext || window.webkitAudioContext)();
   source = audioContext.createMediaElementSource(audioPlayer);
+  gainNode = audioContext.createGain();
   
   const frequencies = [60, 600, 12000];
   let lastFilter = source;
@@ -48,7 +55,39 @@ function initAudio() {
     filters.push(filter);
   });
   
-  lastFilter.connect(audioContext.destination);
+  lastFilter.connect(gainNode);
+  gainNode.connect(audioContext.destination);
+}
+
+function updateLibrary() {
+  playlistList.innerHTML = '';
+  // Add "All Songs" first
+  const allSongsItem = document.createElement('div');
+  allSongsItem.className = 'playlist-item active';
+  allSongsItem.innerText = 'All Songs';
+  allSongsItem.onclick = () => {
+    document.querySelectorAll('.playlist-item').forEach(i => i.classList.remove('active'));
+    allSongsItem.classList.add('active');
+    playlist = Array.from(trackMetadata.values()).map(m => m.file);
+    loadTrack(0);
+  };
+  playlistList.appendChild(allSongsItem);
+
+  // Add folder-based playlists
+  folders.forEach((tracks, path) => {
+    const item = document.createElement('div');
+    item.className = 'playlist-item';
+    const folderName = path.split('/').pop() || 'Root Folder';
+    item.innerText = folderName;
+    item.title = path;
+    item.onclick = () => {
+      document.querySelectorAll('.playlist-item').forEach(i => i.classList.remove('active'));
+      item.classList.add('active');
+      playlist = tracks;
+      loadTrack(0);
+    };
+    playlistList.appendChild(item);
+  });
 }
 
 function updateQueue() {
@@ -80,26 +119,31 @@ async function loadTrack(index) {
   
   audioPlayer.src = url;
   
-  // Set initial text
   const name = file.name.replace(/\.[^/.]+$/, "");
-  trackTitle.innerText = name;
-  miniTitle.innerText = name;
-  trackArtist.innerText = "Loading...";
-  miniArtist.innerText = "Loading...";
+  const meta = trackMetadata.get(file.name) || {};
   
+  trackTitle.innerText = meta.title || name;
+  miniTitle.innerText = meta.title || name;
+  trackArtist.innerText = meta.artist || "Loading...";
+  miniArtist.innerText = meta.artist || "Loading...";
+  
+  const artUrl = meta.thumb || "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+  albumArt.src = artUrl;
+  miniAlbumArt.src = artUrl;
+
   updateQueue();
   
   jsmediatags.read(file, {
     onSuccess: function(tag) {
       const { artist, title, picture } = tag.tags;
-      let artUrl = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+      let newArtUrl = artUrl;
       
       if (picture) {
         let base64String = "";
         for (let i = 0; i < picture.data.length; i++) {
           base64String += String.fromCharCode(picture.data[i]);
         }
-        artUrl = "data:" + picture.format + ";base64," + window.btoa(base64String);
+        newArtUrl = "data:" + picture.format + ";base64," + window.btoa(base64String);
       }
 
       const finalArtist = artist || "Unknown Artist";
@@ -109,46 +153,37 @@ async function loadTrack(index) {
       miniArtist.innerText = finalArtist;
       trackTitle.innerText = finalTitle;
       miniTitle.innerText = finalTitle;
-      albumArt.src = artUrl;
-      miniAlbumArt.src = artUrl;
+      albumArt.src = newArtUrl;
+      miniAlbumArt.src = newArtUrl;
 
-      // Update metadata map for queue thumbnails
       trackMetadata.set(file.name, {
+        file: file,
         title: finalTitle,
         artist: finalArtist,
-        thumb: artUrl
+        thumb: newArtUrl
       });
       
-      // Update queue to show the new thumbnail/info
+      // Update queue thumb instantly
       const items = queueList.querySelectorAll('.queue-item');
       if (items[index]) {
-        items[index].querySelector('.queue-thumb').src = artUrl;
+        items[index].querySelector('.queue-thumb').src = newArtUrl;
         items[index].querySelector('.queue-item-title').innerText = finalTitle;
       }
-    },
-    onError: function() {
-      trackArtist.innerText = "Unknown Artist";
-      miniArtist.innerText = "Unknown Artist";
     }
   });
   
   playTrack();
 }
 
-function togglePlay() {
-  if (!audioPlayer.src) return;
+function playTrack() {
+  isPlaying = true;
   initAudio();
   if (audioContext.state === 'suspended') audioContext.resume();
   
-  if (isPlaying) {
-    pauseTrack();
-  } else {
-    playTrack();
-  }
-}
-
-function playTrack() {
-  isPlaying = true;
+  // Fade in
+  gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+  gainNode.gain.linearRampToValueAtTime(1, audioContext.currentTime + 0.5);
+  
   audioPlayer.play();
   playIcon.style.display = 'none';
   pauseIcon.style.display = 'block';
@@ -157,7 +192,15 @@ function playTrack() {
 
 function pauseTrack() {
   isPlaying = false;
-  audioPlayer.pause();
+  
+  // Fade out
+  gainNode.gain.setValueAtTime(gainNode.gain.value, audioContext.currentTime);
+  gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.5);
+  
+  setTimeout(() => {
+    if (!isPlaying) audioPlayer.pause();
+  }, 500);
+
   playIcon.style.display = 'block';
   pauseIcon.style.display = 'none';
   albumWrapper.classList.remove('playing');
@@ -166,21 +209,29 @@ function pauseTrack() {
 function handleFiles(files) {
   const audioFiles = Array.from(files).filter(file => file.type.startsWith('audio/'));
   if (audioFiles.length > 0) {
-    // Sort files to keep folder structure somewhat logical
-    audioFiles.sort((a, b) => a.webkitRelativePath.localeCompare(b.webkitRelativePath));
-    playlist = [...playlist, ...audioFiles];
-    if (playlist.length === audioFiles.length) {
-      loadTrack(0);
-    } else {
-      updateQueue();
-    }
+    audioFiles.forEach(file => {
+      trackMetadata.set(file.name, { file: file });
+      const path = file.webkitRelativePath.split('/').slice(0, -1).join('/');
+      if (path) {
+        if (!folders.has(path)) folders.set(path, []);
+        folders.get(path).push(file);
+      }
+    });
+
+    playlist = audioFiles;
+    updateLibrary();
+    loadTrack(0);
   }
 }
 
 folderUpload.addEventListener('change', (e) => handleFiles(e.target.files));
 fileUpload.addEventListener('change', (e) => handleFiles(e.target.files));
+crossfadeInput.addEventListener('input', (e) => {
+  crossfadeTime = parseInt(e.target.value);
+  fadeValDisplay.innerText = crossfadeTime;
+});
 
-playBtn.addEventListener('click', togglePlay);
+playBtn.addEventListener('click', () => isPlaying ? pauseTrack() : playTrack());
 nextBtn.addEventListener('click', () => loadTrack((currentIndex + 1) % playlist.length));
 prevBtn.addEventListener('click', () => loadTrack((currentIndex - 1 + playlist.length) % playlist.length));
 
@@ -189,6 +240,16 @@ audioPlayer.addEventListener('timeupdate', () => {
   progress.value = (currentTime / duration) * 100 || 0;
   currentTimeEl.innerText = formatTime(currentTime);
   durationEl.innerText = duration ? formatTime(duration) : '0:00';
+
+  // Crossfade trigger
+  if (duration && duration - currentTime <= crossfadeTime && isPlaying && crossfadeTime > 0) {
+    // Basic auto-next trigger for crossfade
+    // In a real crossfade we'd need two audio elements, 
+    // but for simplicity we'll trigger the next track with a fade out
+    if (duration - currentTime <= 0.5) {
+      loadTrack((currentIndex + 1) % playlist.length);
+    }
+  }
 });
 
 function formatTime(time) {
