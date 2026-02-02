@@ -8,6 +8,18 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
+  <!-- Loading Screen -->
+  <div id="loading-screen" class="loading-overlay">
+    <div class="loader-content">
+      <i class="fas fa-compact-disc fa-spin"></i>
+      <h2>Optimizing Library</h2>
+      <p id="loading-status">Scanning tracks...</p>
+      <div class="load-bar-container">
+        <div id="load-bar" class="load-bar"></div>
+      </div>
+    </div>
+  </div>
+
   <div class="app-container">
     <!-- Sidebar -->
     <div class="sidebar">
@@ -26,9 +38,7 @@
         <div class="library-header">
           <i class="fas fa-book"></i> <span>Your Library</span>
         </div>
-        <div id="playlist-list" class="playlist-list">
-          <!-- Folders/Playlists will appear here -->
-        </div>
+        <div id="playlist-list" class="playlist-list"></div>
       </div>
 
       <div class="upload-section">
@@ -90,9 +100,7 @@
     <!-- Queue Sidebar -->
     <div class="queue-sidebar">
       <h3>Queue</h3>
-      <div id="queue-list" class="queue-list">
-        <!-- Tracks will be added here -->
-      </div>
+      <div id="queue-list" class="queue-list"></div>
     </div>
 
     <!-- Bottom Player Bar -->
@@ -107,6 +115,7 @@
       
       <div class="player-controls">
         <div class="control-buttons">
+          <button id="shuffle-btn" class="ctrl-btn secondary-btn"><i class="fas fa-random"></i></button>
           <button id="prev-btn" class="ctrl-btn"><i class="fas fa-step-backward"></i></button>
           <button id="play-btn" class="ctrl-btn play-main"><i id="play-icon" class="fas fa-play"></i><i id="pause-icon" class="fas fa-pause" style="display:none"></i></button>
           <button id="next-btn" class="ctrl-btn"><i class="fas fa-step-forward"></i></button>

@@ -1,5 +1,6 @@
 const audioPlayer = document.getElementById('audio-player');
 const playBtn = document.getElementById('play-btn');
+const shuffleBtn = document.getElementById('shuffle-btn');
 const prevBtn = document.getElementById('prev-btn');
 const nextBtn = document.getElementById('next-btn');
 const progress = document.getElementById('progress');
@@ -22,12 +23,17 @@ const playlistList = document.getElementById('playlist-list');
 const crossfadeInput = document.getElementById('crossfade');
 const fadeValDisplay = document.getElementById('fade-val');
 const eqBands = document.querySelectorAll('.eq-band');
+const loadingScreen = document.getElementById('loading-screen');
+const loadingStatus = document.getElementById('loading-status');
+const loadBar = document.getElementById('load-bar');
 
+let originalPlaylist = [];
 let playlist = [];
 let currentIndex = 0;
 let isPlaying = false;
+let isShuffled = false;
 let trackMetadata = new Map();
-let folders = new Map(); // Store tracks by folder path
+let folders = new Map();
 let crossfadeTime = 5;
 
 // Web Audio API Context
@@ -59,35 +65,90 @@ function initAudio() {
   gainNode.connect(audioContext.destination);
 }
 
+async function scanMetadataRecursive(files) {
+  loadingScreen.style.display = 'flex';
+  const total = files.length;
+  let processed = 0;
+
+  for (const file of files) {
+    loadingStatus.innerText = `Scanning: ${file.name}`;
+    loadBar.style.width = `${(processed / total) * 100}%`;
+
+    await new Promise(resolve => {
+      jsmediatags.read(file, {
+        onSuccess: (tag) => {
+          const { artist, title, picture } = tag.tags;
+          let artUrl = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+          if (picture) {
+            let base64String = "";
+            for (let i = 0; i < picture.data.length; i++) base64String += String.fromCharCode(picture.data[i]);
+            artUrl = `data:${picture.format};base64,${window.btoa(base64String)}`;
+          }
+          trackMetadata.set(file.name, {
+            file,
+            title: title || file.name.replace(/\.[^/.]+$/, ""),
+            artist: artist || "Unknown Artist",
+            thumb: artUrl
+          });
+          resolve();
+        },
+        onError: () => {
+          trackMetadata.set(file.name, {
+            file,
+            title: file.name.replace(/\.[^/.]+$/, ""),
+            artist: "Unknown Artist",
+            thumb: "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+          });
+          resolve();
+        }
+      });
+    });
+    processed++;
+  }
+  
+  loadingScreen.style.display = 'none';
+  updateLibrary();
+  loadTrack(0);
+}
+
 function updateLibrary() {
   playlistList.innerHTML = '';
-  // Add "All Songs" first
-  const allSongsItem = document.createElement('div');
-  allSongsItem.className = 'playlist-item active';
-  allSongsItem.innerText = 'All Songs';
-  allSongsItem.onclick = () => {
+  const allItem = document.createElement('div');
+  allItem.className = 'playlist-item active';
+  allItem.innerText = 'All Songs';
+  allItem.onclick = () => {
     document.querySelectorAll('.playlist-item').forEach(i => i.classList.remove('active'));
-    allSongsItem.classList.add('active');
-    playlist = Array.from(trackMetadata.values()).map(m => m.file);
-    loadTrack(0);
+    allItem.classList.add('active');
+    originalPlaylist = Array.from(trackMetadata.values()).map(m => m.file);
+    applyShuffleAndLoad(0);
   };
-  playlistList.appendChild(allSongsItem);
+  playlistList.appendChild(allItem);
 
-  // Add folder-based playlists
   folders.forEach((tracks, path) => {
     const item = document.createElement('div');
     item.className = 'playlist-item';
-    const folderName = path.split('/').pop() || 'Root Folder';
-    item.innerText = folderName;
-    item.title = path;
+    item.innerText = path.split('/').pop() || 'Root';
     item.onclick = () => {
       document.querySelectorAll('.playlist-item').forEach(i => i.classList.remove('active'));
       item.classList.add('active');
-      playlist = tracks;
-      loadTrack(0);
+      originalPlaylist = tracks;
+      applyShuffleAndLoad(0);
     };
     playlistList.appendChild(item);
   });
+}
+
+function applyShuffleAndLoad(index) {
+  if (isShuffled) {
+    const currentFile = originalPlaylist[index];
+    playlist = [...originalPlaylist].sort(() => Math.random() - 0.5);
+    currentIndex = playlist.indexOf(currentFile);
+  } else {
+    playlist = [...originalPlaylist];
+    currentIndex = index;
+  }
+  updateQueue();
+  loadTrack(currentIndex);
 }
 
 function updateQueue() {
@@ -95,14 +156,11 @@ function updateQueue() {
   playlist.forEach((file, index) => {
     const item = document.createElement('div');
     item.className = `queue-item ${index === currentIndex ? 'active' : ''}`;
-    
     const meta = trackMetadata.get(file.name) || {};
-    const thumbSrc = meta.thumb || "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
-    
     item.innerHTML = `
-      <img src="${thumbSrc}" class="queue-thumb">
+      <img src="${meta.thumb || ''}" class="queue-thumb">
       <div class="queue-item-info">
-        <div class="queue-item-title">${meta.title || file.name.replace(/\.[^/.]+$/, "")}</div>
+        <div class="queue-item-title">${meta.title || file.name}</div>
       </div>
     `;
     item.onclick = () => loadTrack(index);
@@ -110,68 +168,19 @@ function updateQueue() {
   });
 }
 
-async function loadTrack(index) {
+function loadTrack(index) {
   if (index < 0 || index >= playlist.length) return;
-  
   currentIndex = index;
   const file = playlist[currentIndex];
-  const url = URL.createObjectURL(file);
-  
-  audioPlayer.src = url;
-  
-  const name = file.name.replace(/\.[^/.]+$/, "");
+  audioPlayer.src = URL.createObjectURL(file);
   const meta = trackMetadata.get(file.name) || {};
-  
-  trackTitle.innerText = meta.title || name;
-  miniTitle.innerText = meta.title || name;
-  trackArtist.innerText = meta.artist || "Loading...";
-  miniArtist.innerText = meta.artist || "Loading...";
-  
-  const artUrl = meta.thumb || "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
-  albumArt.src = artUrl;
-  miniAlbumArt.src = artUrl;
-
+  trackTitle.innerText = meta.title;
+  miniTitle.innerText = meta.title;
+  trackArtist.innerText = meta.artist;
+  miniArtist.innerText = meta.artist;
+  albumArt.src = meta.thumb;
+  miniAlbumArt.src = meta.thumb;
   updateQueue();
-  
-  jsmediatags.read(file, {
-    onSuccess: function(tag) {
-      const { artist, title, picture } = tag.tags;
-      let newArtUrl = artUrl;
-      
-      if (picture) {
-        let base64String = "";
-        for (let i = 0; i < picture.data.length; i++) {
-          base64String += String.fromCharCode(picture.data[i]);
-        }
-        newArtUrl = "data:" + picture.format + ";base64," + window.btoa(base64String);
-      }
-
-      const finalArtist = artist || "Unknown Artist";
-      const finalTitle = title || name;
-
-      trackArtist.innerText = finalArtist;
-      miniArtist.innerText = finalArtist;
-      trackTitle.innerText = finalTitle;
-      miniTitle.innerText = finalTitle;
-      albumArt.src = newArtUrl;
-      miniAlbumArt.src = newArtUrl;
-
-      trackMetadata.set(file.name, {
-        file: file,
-        title: finalTitle,
-        artist: finalArtist,
-        thumb: newArtUrl
-      });
-      
-      // Update queue thumb instantly
-      const items = queueList.querySelectorAll('.queue-item');
-      if (items[index]) {
-        items[index].querySelector('.queue-thumb').src = newArtUrl;
-        items[index].querySelector('.queue-item-title').innerText = finalTitle;
-      }
-    }
-  });
-  
   playTrack();
 }
 
@@ -179,11 +188,8 @@ function playTrack() {
   isPlaying = true;
   initAudio();
   if (audioContext.state === 'suspended') audioContext.resume();
-  
-  // Fade in
   gainNode.gain.setValueAtTime(0, audioContext.currentTime);
-  gainNode.gain.linearRampToValueAtTime(1, audioContext.currentTime + 0.5);
-  
+  gainNode.gain.linearRampToValueAtTime(1, audioContext.currentTime + 0.2);
   audioPlayer.play();
   playIcon.style.display = 'none';
   pauseIcon.style.display = 'block';
@@ -192,43 +198,35 @@ function playTrack() {
 
 function pauseTrack() {
   isPlaying = false;
-  
-  // Fade out
   gainNode.gain.setValueAtTime(gainNode.gain.value, audioContext.currentTime);
-  gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.5);
-  
-  setTimeout(() => {
-    if (!isPlaying) audioPlayer.pause();
-  }, 500);
-
+  gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.2);
+  setTimeout(() => { if (!isPlaying) audioPlayer.pause(); }, 200);
   playIcon.style.display = 'block';
   pauseIcon.style.display = 'none';
   albumWrapper.classList.remove('playing');
 }
 
 function handleFiles(files) {
-  const audioFiles = Array.from(files).filter(file => file.type.startsWith('audio/'));
+  const audioFiles = Array.from(files).filter(f => f.type.startsWith('audio/'));
   if (audioFiles.length > 0) {
-    audioFiles.forEach(file => {
-      trackMetadata.set(file.name, { file: file });
-      const path = file.webkitRelativePath.split('/').slice(0, -1).join('/');
+    audioFiles.forEach(f => {
+      const path = f.webkitRelativePath.split('/').slice(0, -1).join('/');
       if (path) {
         if (!folders.has(path)) folders.set(path, []);
-        folders.get(path).push(file);
+        folders.get(path).push(f);
       }
     });
-
-    playlist = audioFiles;
-    updateLibrary();
-    loadTrack(0);
+    originalPlaylist = audioFiles;
+    scanMetadataRecursive(audioFiles);
   }
 }
 
-folderUpload.addEventListener('change', (e) => handleFiles(e.target.files));
-fileUpload.addEventListener('change', (e) => handleFiles(e.target.files));
-crossfadeInput.addEventListener('input', (e) => {
-  crossfadeTime = parseInt(e.target.value);
-  fadeValDisplay.innerText = crossfadeTime;
+folderUpload.addEventListener('change', e => handleFiles(e.target.files));
+fileUpload.addEventListener('change', e => handleFiles(e.target.files));
+shuffleBtn.addEventListener('click', () => {
+  isShuffled = !isShuffled;
+  shuffleBtn.classList.toggle('active', isShuffled);
+  applyShuffleAndLoad(currentIndex);
 });
 
 playBtn.addEventListener('click', () => isPlaying ? pauseTrack() : playTrack());
@@ -240,40 +238,17 @@ audioPlayer.addEventListener('timeupdate', () => {
   progress.value = (currentTime / duration) * 100 || 0;
   currentTimeEl.innerText = formatTime(currentTime);
   durationEl.innerText = duration ? formatTime(duration) : '0:00';
-
-  // Crossfade trigger
-  if (duration && duration - currentTime <= crossfadeTime && isPlaying && crossfadeTime > 0) {
-    // Basic auto-next trigger for crossfade
-    // In a real crossfade we'd need two audio elements, 
-    // but for simplicity we'll trigger the next track with a fade out
-    if (duration - currentTime <= 0.5) {
-      loadTrack((currentIndex + 1) % playlist.length);
-    }
-  }
 });
 
-function formatTime(time) {
-  const mins = Math.floor(time / 60);
-  const secs = Math.floor(time % 60);
-  return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+function formatTime(t) {
+  const m = Math.floor(t / 60), s = Math.floor(t % 60);
+  return `${m}:${s < 10 ? '0' : ''}${s}`;
 }
 
-progress.addEventListener('input', (e) => {
-  if (audioPlayer.duration) {
-    audioPlayer.currentTime = (e.target.value / 100) * audioPlayer.duration;
-  }
+progress.addEventListener('input', e => {
+  if (audioPlayer.duration) audioPlayer.currentTime = (e.target.value / 100) * audioPlayer.duration;
 });
 
-volumeSlider.addEventListener('input', (e) => {
-  audioPlayer.volume = e.target.value / 100;
-});
-
-eqBands.forEach((band, index) => {
-  band.addEventListener('input', (e) => {
-    if (filters[index]) {
-      filters[index].gain.value = parseFloat(e.target.value);
-    }
-  });
-});
-
+volumeSlider.addEventListener('input', e => audioPlayer.volume = e.target.value / 100);
+eqBands.forEach((b, i) => b.addEventListener('input', e => { if (filters[i]) filters[i].gain.value = parseFloat(e.target.value); }));
 audioPlayer.addEventListener('ended', () => loadTrack((currentIndex + 1) % playlist.length));
