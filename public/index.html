@@ -3,97 +3,108 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Vinyl Music Player</title>
+  <title>Spotify Desktop</title>
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
-  <div class="player-container">
-    <h1>Vinyl Player</h1>
-    
-    <div class="upload-section">
-      <label for="folder-upload" class="upload-btn">
-        Upload Folder
-      </label>
-      <input type="file" id="folder-upload" webkitdirectory directory multiple hidden>
-      <p id="file-name">No folder selected</p>
-    </div>
-
-    <div class="vinyl-container">
-      <div class="vinyl-wrapper">
-        <img id="album-art" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Album Art">
-        <img class="vinyl-overlay" src="vinyl-overlay.png" alt="Vinyl Texture">
+  <div class="app-container">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="logo">
+        <i class="fab fa-spotify"></i>
+        <span>MusicPlayer</span>
+      </div>
+      <nav>
+        <ul>
+          <li class="active"><i class="fas fa-home"></i> Home</li>
+          <li><i class="fas fa-search"></i> Search</li>
+          <li><i class="fas fa-book"></i> Your Library</li>
+        </ul>
+      </nav>
+      <div class="upload-section">
+        <label for="folder-upload" class="upload-btn">
+          <i class="fas fa-folder-plus"></i> Upload Folder
+        </label>
+        <input type="file" id="folder-upload" webkitdirectory directory multiple hidden>
+      </div>
+      <div class="eq-section">
+        <h3>Equalizer</h3>
+        <div class="eq-grid">
+          <div class="eq-slider">
+            <input type="range" class="eq-band" data-freq="60" min="-12" max="12" value="0">
+            <label>Bass</label>
+          </div>
+          <div class="eq-slider">
+            <input type="range" class="eq-band" data-freq="600" min="-12" max="12" value="0">
+            <label>Mid</label>
+          </div>
+          <div class="eq-slider">
+            <input type="range" class="eq-band" data-freq="12000" min="-12" max="12" value="0">
+            <label>Treble</label>
+          </div>
+        </div>
       </div>
     </div>
 
-    <div class="track-info">
-      <h2 id="track-title">Select a folder</h2>
-    </div>
-
-    <div class="eq-container">
-      <div class="eq-slider">
-        <label>60Hz</label>
-        <input type="range" class="eq-band" data-freq="60" min="-12" max="12" value="0">
-      </div>
-      <div class="eq-slider">
-        <label>170Hz</label>
-        <input type="range" class="eq-band" data-freq="170" min="-12" max="12" value="0">
-      </div>
-      <div class="eq-slider">
-        <label>310Hz</label>
-        <input type="range" class="eq-band" data-freq="310" min="-12" max="12" value="0">
-      </div>
-      <div class="eq-slider">
-        <label>600Hz</label>
-        <input type="range" class="eq-band" data-freq="600" min="-12" max="12" value="0">
-      </div>
-      <div class="eq-slider">
-        <label>1k</label>
-        <input type="range" class="eq-band" data-freq="1000" min="-12" max="12" value="0">
-      </div>
-      <div class="eq-slider">
-        <label>3k</label>
-        <input type="range" class="eq-band" data-freq="3000" min="-12" max="12" value="0">
-      </div>
-      <div class="eq-slider">
-        <label>6k</label>
-        <input type="range" class="eq-band" data-freq="6000" min="-12" max="12" value="0">
-      </div>
-      <div class="eq-slider">
-        <label>12k</label>
-        <input type="range" class="eq-band" data-freq="12000" min="-12" max="12" value="0">
-      </div>
-      <div class="eq-slider">
-        <label>14k</label>
-        <input type="range" class="eq-band" data-freq="14000" min="-12" max="12" value="0">
-      </div>
-      <div class="eq-slider">
-        <label>16k</label>
-        <input type="range" class="eq-band" data-freq="16000" min="-12" max="12" value="0">
+    <!-- Main Content -->
+    <div class="main-content">
+      <header>
+        <div class="nav-controls">
+          <i class="fas fa-chevron-left"></i>
+          <i class="fas fa-chevron-right"></i>
+        </div>
+      </header>
+      <div class="player-view">
+        <div class="album-container">
+          <div class="album-wrapper">
+            <img id="album-art" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Album Art">
+          </div>
+        </div>
+        <div class="track-details">
+          <h1 id="track-title">Select a folder to start</h1>
+          <p id="track-artist">No folder selected</p>
+        </div>
       </div>
     </div>
 
-    <div class="progress-container">
-      <span id="current-time">0:00</span>
-      <input type="range" id="progress" value="0" min="0" max="100">
-      <span id="duration">0:00</span>
+    <!-- Queue Sidebar -->
+    <div class="queue-sidebar">
+      <h3>Queue</h3>
+      <div id="queue-list" class="queue-list">
+        <!-- Tracks will be added here -->
+      </div>
     </div>
 
-    <div class="controls">
-      <button id="prev-btn" class="control-btn">
-        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
-      </button>
-      <button id="play-btn" class="control-btn play">
-        <svg id="play-icon" viewBox="0 0 24 24" width="32" height="32" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-        <svg id="pause-icon" viewBox="0 0 24 24" width="32" height="32" fill="currentColor" style="display: none;"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
-      </button>
-      <button id="next-btn" class="control-btn">
-        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
-      </button>
-    </div>
+    <!-- Bottom Player Bar -->
+    <div class="player-bar">
+      <div class="current-track">
+        <img id="mini-album-art" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7">
+        <div class="mini-info">
+          <div class="mini-title" id="mini-title">Unknown Title</div>
+          <div class="mini-artist" id="mini-artist">Unknown Artist</div>
+        </div>
+      </div>
+      
+      <div class="player-controls">
+        <div class="control-buttons">
+          <button id="prev-btn" class="ctrl-btn"><i class="fas fa-step-backward"></i></button>
+          <button id="play-btn" class="ctrl-btn play-main"><i id="play-icon" class="fas fa-play"></i><i id="pause-icon" class="fas fa-pause" style="display:none"></i></button>
+          <button id="next-btn" class="ctrl-btn"><i class="fas fa-step-forward"></i></button>
+        </div>
+        <div class="playback-bar">
+          <span id="current-time">0:00</span>
+          <div class="progress-wrap">
+            <input type="range" id="progress" value="0" min="0" max="100">
+          </div>
+          <span id="duration">0:00</span>
+        </div>
+      </div>
 
-    <div class="volume-container">
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
-      <input type="range" id="volume" value="100" min="0" max="100">
+      <div class="volume-controls">
+        <i class="fas fa-volume-up"></i>
+        <input type="range" id="volume" value="100" min="0" max="100">
+      </div>
     </div>
   </div>
 

@@ -4,22 +4,26 @@ const prevBtn = document.getElementById('prev-btn');
 const nextBtn = document.getElementById('next-btn');
 const progress = document.getElementById('progress');
 const trackTitle = document.getElementById('track-title');
+const trackArtist = document.getElementById('track-artist');
+const miniTitle = document.getElementById('mini-title');
+const miniArtist = document.getElementById('mini-artist');
 const folderUpload = document.getElementById('folder-upload');
-const fileNameDisplay = document.getElementById('file-name');
 const currentTimeEl = document.getElementById('current-time');
 const durationEl = document.getElementById('duration');
 const volumeSlider = document.getElementById('volume');
 const playIcon = document.getElementById('play-icon');
 const pauseIcon = document.getElementById('pause-icon');
-const vinylWrapper = document.querySelector('.vinyl-wrapper');
+const albumWrapper = document.querySelector('.album-wrapper');
 const albumArt = document.getElementById('album-art');
+const miniAlbumArt = document.getElementById('mini-album-art');
+const queueList = document.getElementById('queue-list');
 const eqBands = document.querySelectorAll('.eq-band');
 
 let playlist = [];
 let currentIndex = 0;
 let isPlaying = false;
 
-// Web Audio API Context for EQ
+// Web Audio API Context
 let audioContext;
 let source;
 let filters = [];
@@ -29,22 +33,36 @@ function initAudio() {
   audioContext = new (window.AudioContext || window.webkitAudioContext)();
   source = audioContext.createMediaElementSource(audioPlayer);
   
-  const frequencies = [60, 170, 310, 600, 1000, 3000, 6000, 12000, 14000, 16000];
-  
+  // Simplified Frequencies for Bass, Mid, Treble
+  const frequencies = [60, 600, 12000];
   let lastFilter = source;
+  
   frequencies.forEach(freq => {
     const filter = audioContext.createBiquadFilter();
     filter.type = 'peaking';
     filter.frequency.value = freq;
-    filter.Q.value = 1;
     filter.gain.value = 0;
-    
     lastFilter.connect(filter);
     lastFilter = filter;
     filters.push(filter);
   });
   
   lastFilter.connect(audioContext.destination);
+}
+
+function updateQueue() {
+  queueList.innerHTML = '';
+  playlist.forEach((file, index) => {
+    const item = document.createElement('div');
+    item.className = `queue-item ${index === currentIndex ? 'active' : ''}`;
+    item.innerHTML = `
+      <div class="queue-item-info">
+        <div class="queue-item-title">${file.name.replace(/\.[^/.]+$/, "")}</div>
+      </div>
+    `;
+    item.onclick = () => loadTrack(index);
+    queueList.appendChild(item);
+  });
 }
 
 function loadTrack(index) {
@@ -55,26 +73,45 @@ function loadTrack(index) {
   const url = URL.createObjectURL(file);
   
   audioPlayer.src = url;
-  trackTitle.innerText = file.name.replace(/\.[^/.]+$/, "");
+  const name = file.name.replace(/\.[^/.]+$/, "");
+  trackTitle.innerText = name;
+  miniTitle.innerText = name;
   
-  // Extract Metadata/Art
+  updateQueue();
+  
   jsmediatags.read(file, {
     onSuccess: function(tag) {
-      const image = tag.tags.picture;
-      if (image) {
-        let base64String = "";
-        for (let i = 0; i < image.data.length; i++) {
-          base64String += String.fromCharCode(image.data[i]);
-        }
-        const base64 = "data:" + image.format + ";base64," + window.btoa(base64String);
-        albumArt.src = base64;
+      const { artist, title, picture } = tag.tags;
+      if (artist) {
+        trackArtist.innerText = artist;
+        miniArtist.innerText = artist;
       } else {
-        albumArt.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+        trackArtist.innerText = "Unknown Artist";
+        miniArtist.innerText = "Unknown Artist";
+      }
+      
+      if (title) {
+        trackTitle.innerText = title;
+        miniTitle.innerText = title;
+      }
+
+      if (picture) {
+        let base64String = "";
+        for (let i = 0; i < picture.data.length; i++) {
+          base64String += String.fromCharCode(picture.data[i]);
+        }
+        const base64 = "data:" + picture.format + ";base64," + window.btoa(base64String);
+        albumArt.src = base64;
+        miniAlbumArt.src = base64;
+      } else {
+        const defaultArt = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+        albumArt.src = defaultArt;
+        miniAlbumArt.src = defaultArt;
       }
     },
-    onError: function(error) {
-      console.log('Error reading tags: ', error.type, error.info);
+    onError: function() {
       albumArt.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+      miniAlbumArt.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
     }
   });
   
@@ -98,7 +135,7 @@ function playTrack() {
   audioPlayer.play();
   playIcon.style.display = 'none';
   pauseIcon.style.display = 'block';
-  vinylWrapper.classList.add('playing');
+  albumWrapper.classList.add('playing');
 }
 
 function pauseTrack() {
@@ -106,14 +143,13 @@ function pauseTrack() {
   audioPlayer.pause();
   playIcon.style.display = 'block';
   pauseIcon.style.display = 'none';
-  vinylWrapper.classList.remove('playing');
+  albumWrapper.classList.remove('playing');
 }
 
 folderUpload.addEventListener('change', (e) => {
   const files = Array.from(e.target.files).filter(file => file.type.startsWith('audio/'));
   if (files.length > 0) {
     playlist = files;
-    fileNameDisplay.innerText = `${files.length} tracks loaded`;
     loadTrack(0);
   }
 });
