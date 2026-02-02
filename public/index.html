@@ -3,33 +3,73 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Music Player</title>
+  <title>Vinyl Music Player</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <div class="player-container">
-    <h1>Music Player</h1>
+    <h1>Vinyl Player</h1>
     
     <div class="upload-section">
-      <label for="audio-upload" class="upload-btn">
-        Choose Music File
+      <label for="folder-upload" class="upload-btn">
+        Upload Folder
       </label>
-      <input type="file" id="audio-upload" accept="audio/*" hidden>
-      <p id="file-name">No file selected</p>
+      <input type="file" id="folder-upload" webkitdirectory directory multiple hidden>
+      <p id="file-name">No folder selected</p>
     </div>
 
-    <div class="album-art">
-      <div class="default-art">
-        <svg viewBox="0 0 100 100" width="150" height="150">
-          <circle cx="50" cy="50" r="45" fill="#333"/>
-          <circle cx="50" cy="50" r="15" fill="#1a1a1a"/>
-          <circle cx="50" cy="50" r="5" fill="#333"/>
-        </svg>
+    <div class="vinyl-container">
+      <div class="vinyl-wrapper">
+        <img id="album-art" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Album Art">
+        <img class="vinyl-overlay" src="vinyl-overlay.png" alt="Vinyl Texture">
       </div>
     </div>
 
     <div class="track-info">
-      <h2 id="track-title">Select a track</h2>
+      <h2 id="track-title">Select a folder</h2>
+    </div>
+
+    <div class="eq-container">
+      <div class="eq-slider">
+        <label>60Hz</label>
+        <input type="range" class="eq-band" data-freq="60" min="-12" max="12" value="0">
+      </div>
+      <div class="eq-slider">
+        <label>170Hz</label>
+        <input type="range" class="eq-band" data-freq="170" min="-12" max="12" value="0">
+      </div>
+      <div class="eq-slider">
+        <label>310Hz</label>
+        <input type="range" class="eq-band" data-freq="310" min="-12" max="12" value="0">
+      </div>
+      <div class="eq-slider">
+        <label>600Hz</label>
+        <input type="range" class="eq-band" data-freq="600" min="-12" max="12" value="0">
+      </div>
+      <div class="eq-slider">
+        <label>1k</label>
+        <input type="range" class="eq-band" data-freq="1000" min="-12" max="12" value="0">
+      </div>
+      <div class="eq-slider">
+        <label>3k</label>
+        <input type="range" class="eq-band" data-freq="3000" min="-12" max="12" value="0">
+      </div>
+      <div class="eq-slider">
+        <label>6k</label>
+        <input type="range" class="eq-band" data-freq="6000" min="-12" max="12" value="0">
+      </div>
+      <div class="eq-slider">
+        <label>12k</label>
+        <input type="range" class="eq-band" data-freq="12000" min="-12" max="12" value="0">
+      </div>
+      <div class="eq-slider">
+        <label>14k</label>
+        <input type="range" class="eq-band" data-freq="14000" min="-12" max="12" value="0">
+      </div>
+      <div class="eq-slider">
+        <label>16k</label>
+        <input type="range" class="eq-band" data-freq="16000" min="-12" max="12" value="0">
+      </div>
     </div>
 
     <div class="progress-container">
@@ -40,34 +80,25 @@
 
     <div class="controls">
       <button id="prev-btn" class="control-btn">
-        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
-          <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/>
-        </svg>
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
       </button>
       <button id="play-btn" class="control-btn play">
-        <svg id="play-icon" viewBox="0 0 24 24" width="32" height="32" fill="currentColor">
-          <path d="M8 5v14l11-7z"/>
-        </svg>
-        <svg id="pause-icon" viewBox="0 0 24 24" width="32" height="32" fill="currentColor" style="display: none;">
-          <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
-        </svg>
+        <svg id="play-icon" viewBox="0 0 24 24" width="32" height="32" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+        <svg id="pause-icon" viewBox="0 0 24 24" width="32" height="32" fill="currentColor" style="display: none;"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
       </button>
       <button id="next-btn" class="control-btn">
-        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
-          <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/>
-        </svg>
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
       </button>
     </div>
 
     <div class="volume-container">
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-        <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
-      </svg>
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
       <input type="range" id="volume" value="100" min="0" max="100">
     </div>
   </div>
 
   <audio id="audio-player"></audio>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
