@@ -8,6 +8,7 @@ const trackArtist = document.getElementById('track-artist');
 const miniTitle = document.getElementById('mini-title');
 const miniArtist = document.getElementById('mini-artist');
 const folderUpload = document.getElementById('folder-upload');
+const fileUpload = document.getElementById('file-upload');
 const currentTimeEl = document.getElementById('current-time');
 const durationEl = document.getElementById('duration');
 const volumeSlider = document.getElementById('volume');
@@ -22,6 +23,7 @@ const eqBands = document.querySelectorAll('.eq-band');
 let playlist = [];
 let currentIndex = 0;
 let isPlaying = false;
+let trackMetadata = new Map(); // Store metadata for icons
 
 // Web Audio API Context
 let audioContext;
@@ -33,7 +35,6 @@ function initAudio() {
   audioContext = new (window.AudioContext || window.webkitAudioContext)();
   source = audioContext.createMediaElementSource(audioPlayer);
   
-  // Simplified Frequencies for Bass, Mid, Treble
   const frequencies = [60, 600, 12000];
   let lastFilter = source;
   
@@ -55,9 +56,14 @@ function updateQueue() {
   playlist.forEach((file, index) => {
     const item = document.createElement('div');
     item.className = `queue-item ${index === currentIndex ? 'active' : ''}`;
+    
+    const meta = trackMetadata.get(file.name) || {};
+    const thumbSrc = meta.thumb || "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+    
     item.innerHTML = `
+      <img src="${thumbSrc}" class="queue-thumb">
       <div class="queue-item-info">
-        <div class="queue-item-title">${file.name.replace(/\.[^/.]+$/, "")}</div>
+        <div class="queue-item-title">${meta.title || file.name.replace(/\.[^/.]+$/, "")}</div>
       </div>
     `;
     item.onclick = () => loadTrack(index);
@@ -65,7 +71,7 @@ function updateQueue() {
   });
 }
 
-function loadTrack(index) {
+async function loadTrack(index) {
   if (index < 0 || index >= playlist.length) return;
   
   currentIndex = index;
@@ -73,45 +79,56 @@ function loadTrack(index) {
   const url = URL.createObjectURL(file);
   
   audioPlayer.src = url;
+  
+  // Set initial text
   const name = file.name.replace(/\.[^/.]+$/, "");
   trackTitle.innerText = name;
   miniTitle.innerText = name;
+  trackArtist.innerText = "Loading...";
+  miniArtist.innerText = "Loading...";
   
   updateQueue();
   
   jsmediatags.read(file, {
     onSuccess: function(tag) {
       const { artist, title, picture } = tag.tags;
-      if (artist) {
-        trackArtist.innerText = artist;
-        miniArtist.innerText = artist;
-      } else {
-        trackArtist.innerText = "Unknown Artist";
-        miniArtist.innerText = "Unknown Artist";
-      }
+      let artUrl = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
       
-      if (title) {
-        trackTitle.innerText = title;
-        miniTitle.innerText = title;
-      }
-
       if (picture) {
         let base64String = "";
         for (let i = 0; i < picture.data.length; i++) {
           base64String += String.fromCharCode(picture.data[i]);
         }
-        const base64 = "data:" + picture.format + ";base64," + window.btoa(base64String);
-        albumArt.src = base64;
-        miniAlbumArt.src = base64;
-      } else {
-        const defaultArt = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
-        albumArt.src = defaultArt;
-        miniAlbumArt.src = defaultArt;
+        artUrl = "data:" + picture.format + ";base64," + window.btoa(base64String);
+      }
+
+      const finalArtist = artist || "Unknown Artist";
+      const finalTitle = title || name;
+
+      trackArtist.innerText = finalArtist;
+      miniArtist.innerText = finalArtist;
+      trackTitle.innerText = finalTitle;
+      miniTitle.innerText = finalTitle;
+      albumArt.src = artUrl;
+      miniAlbumArt.src = artUrl;
+
+      // Update metadata map for queue thumbnails
+      trackMetadata.set(file.name, {
+        title: finalTitle,
+        artist: finalArtist,
+        thumb: artUrl
+      });
+      
+      // Update queue to show the new thumbnail/info
+      const items = queueList.querySelectorAll('.queue-item');
+      if (items[index]) {
+        items[index].querySelector('.queue-thumb').src = artUrl;
+        items[index].querySelector('.queue-item-title').innerText = finalTitle;
       }
     },
     onError: function() {
-      albumArt.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
-      miniAlbumArt.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+      trackArtist.innerText = "Unknown Artist";
+      miniArtist.innerText = "Unknown Artist";
     }
   });
   
@@ -146,13 +163,22 @@ function pauseTrack() {
   albumWrapper.classList.remove('playing');
 }
 
-folderUpload.addEventListener('change', (e) => {
-  const files = Array.from(e.target.files).filter(file => file.type.startsWith('audio/'));
-  if (files.length > 0) {
-    playlist = files;
-    loadTrack(0);
+function handleFiles(files) {
+  const audioFiles = Array.from(files).filter(file => file.type.startsWith('audio/'));
+  if (audioFiles.length > 0) {
+    // Sort files to keep folder structure somewhat logical
+    audioFiles.sort((a, b) => a.webkitRelativePath.localeCompare(b.webkitRelativePath));
+    playlist = [...playlist, ...audioFiles];
+    if (playlist.length === audioFiles.length) {
+      loadTrack(0);
+    } else {
+      updateQueue();
+    }
   }
-});
+}
+
+folderUpload.addEventListener('change', (e) => handleFiles(e.target.files));
+fileUpload.addEventListener('change', (e) => handleFiles(e.target.files));
 
 playBtn.addEventListener('click', togglePlay);
 nextBtn.addEventListener('click', () => loadTrack((currentIndex + 1) % playlist.length));
@@ -172,7 +198,9 @@ function formatTime(time) {
 }
 
 progress.addEventListener('input', (e) => {
-  audioPlayer.currentTime = (e.target.value / 100) * audioPlayer.duration;
+  if (audioPlayer.duration) {
+    audioPlayer.currentTime = (e.target.value / 100) * audioPlayer.duration;
+  }
 });
 
 volumeSlider.addEventListener('input', (e) => {
