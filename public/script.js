@@ -65,6 +65,25 @@ function initAudio() {
   gainNode.connect(audioContext.destination);
 }
 
+// Hardware Media Key Support (Media Session API)
+function updateMediaSession(meta) {
+  if ('mediaSession' in navigator) {
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: meta.title,
+      artist: meta.artist,
+      album: 'Copper Music',
+      artwork: [
+        { src: meta.thumb, sizes: '512x512', type: 'image/png' }
+      ]
+    });
+
+    navigator.mediaSession.setActionHandler('play', playTrack);
+    navigator.mediaSession.setActionHandler('pause', pauseTrack);
+    navigator.mediaSession.setActionHandler('previoustrack', () => loadTrack((currentIndex - 1 + playlist.length) % playlist.length));
+    navigator.mediaSession.setActionHandler('nexttrack', () => loadTrack((currentIndex + 1) % playlist.length));
+  }
+}
+
 async function scanMetadataRecursive(files) {
   loadingScreen.style.display = 'flex';
   const total = files.length;
@@ -196,7 +215,9 @@ function loadTrack(index) {
   miniArtist.innerText = meta.artist;
   albumArt.src = meta.thumb;
   miniAlbumArt.src = meta.thumb;
+  
   updateQueue();
+  updateMediaSession(meta);
   playTrack();
 }
 
@@ -207,9 +228,12 @@ function playTrack() {
   gainNode.gain.setValueAtTime(0, audioContext.currentTime);
   gainNode.gain.linearRampToValueAtTime(1, audioContext.currentTime + 0.2);
   audioPlayer.play();
+  
+  // Update UI State
   playIcon.style.display = 'none';
   pauseIcon.style.display = 'block';
   albumWrapper.classList.add('playing');
+  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
 }
 
 function pauseTrack() {
@@ -217,10 +241,22 @@ function pauseTrack() {
   gainNode.gain.setValueAtTime(gainNode.gain.value, audioContext.currentTime);
   gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.2);
   setTimeout(() => { if (!isPlaying) audioPlayer.pause(); }, 200);
+  
+  // Update UI State
   playIcon.style.display = 'block';
   pauseIcon.style.display = 'none';
   albumWrapper.classList.remove('playing');
+  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
 }
+
+// Sync UI with system-level audio events (e.g. computer pauses music)
+audioPlayer.addEventListener('play', () => {
+  if (!isPlaying) playTrack();
+});
+
+audioPlayer.addEventListener('pause', () => {
+  if (isPlaying) pauseTrack();
+});
 
 function handleFiles(files) {
   const audioFiles = Array.from(files).filter(f => f.type.startsWith('audio/'));
@@ -254,7 +290,6 @@ audioPlayer.addEventListener('timeupdate', () => {
   const progressPercent = (currentTime / duration) * 100 || 0;
   progress.value = progressPercent;
   
-  // Update copper bar
   const copperBar = document.getElementById('copper-bar');
   if (copperBar) {
     copperBar.style.width = `${progressPercent}%`;
