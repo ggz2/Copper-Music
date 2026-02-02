@@ -120,7 +120,7 @@ function updateLibrary() {
     document.querySelectorAll('.playlist-item').forEach(i => i.classList.remove('active'));
     allItem.classList.add('active');
     originalPlaylist = Array.from(trackMetadata.values()).map(m => m.file);
-    applyShuffleAndLoad(0);
+    applyShuffleAndLoad(0, true);
   };
   playlistList.appendChild(allItem);
 
@@ -132,23 +132,39 @@ function updateLibrary() {
       document.querySelectorAll('.playlist-item').forEach(i => i.classList.remove('active'));
       item.classList.add('active');
       originalPlaylist = tracks;
-      applyShuffleAndLoad(0);
+      applyShuffleAndLoad(0, true);
     };
     playlistList.appendChild(item);
   });
 }
 
-function applyShuffleAndLoad(index) {
+function applyShuffleAndLoad(index, shouldStartNew = true) {
+  const currentFile = playlist[currentIndex] || (originalPlaylist.length > 0 ? originalPlaylist[index] : null);
+  
   if (isShuffled) {
-    const currentFile = originalPlaylist[index];
-    playlist = [...originalPlaylist].sort(() => Math.random() - 0.5);
-    currentIndex = playlist.indexOf(currentFile);
+    let others = [...originalPlaylist];
+    if (currentFile) {
+      others = others.filter(f => f.name !== currentFile.name);
+      others.sort(() => Math.random() - 0.5);
+      playlist = [currentFile, ...others];
+    } else {
+      playlist = others.sort(() => Math.random() - 0.5);
+    }
+    currentIndex = 0;
   } else {
     playlist = [...originalPlaylist];
-    currentIndex = index;
+    if (currentFile) {
+      currentIndex = playlist.findIndex(f => f.name === currentFile.name);
+      if (currentIndex === -1) currentIndex = index;
+    } else {
+      currentIndex = index;
+    }
   }
+  
   updateQueue();
-  loadTrack(currentIndex);
+  if (shouldStartNew) {
+    loadTrack(currentIndex);
+  }
 }
 
 function updateQueue() {
@@ -226,7 +242,7 @@ fileUpload.addEventListener('change', e => handleFiles(e.target.files));
 shuffleBtn.addEventListener('click', () => {
   isShuffled = !isShuffled;
   shuffleBtn.classList.toggle('active', isShuffled);
-  applyShuffleAndLoad(currentIndex);
+  applyShuffleAndLoad(currentIndex, false);
 });
 
 playBtn.addEventListener('click', () => isPlaying ? pauseTrack() : playTrack());
@@ -235,7 +251,15 @@ prevBtn.addEventListener('click', () => loadTrack((currentIndex - 1 + playlist.l
 
 audioPlayer.addEventListener('timeupdate', () => {
   const { duration, currentTime } = audioPlayer;
-  progress.value = (currentTime / duration) * 100 || 0;
+  const progressPercent = (currentTime / duration) * 100 || 0;
+  progress.value = progressPercent;
+  
+  // Update copper bar
+  const copperBar = document.getElementById('copper-bar');
+  if (copperBar) {
+    copperBar.style.width = `${progressPercent}%`;
+  }
+  
   currentTimeEl.innerText = formatTime(currentTime);
   durationEl.innerText = duration ? formatTime(duration) : '0:00';
 });
