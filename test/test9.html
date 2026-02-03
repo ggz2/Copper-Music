@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Copper Music</title>
+    <link rel="icon" type="image/png" href="https://static.wikia.nocookie.net/minecraft_gamepedia/images/8/86/Copper_Block_JE1_BE1.png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --copper: #b87333;
+            --bg-black: #000000;
+            --bg-dark: #121212;
+            --bg-elevated: #181818;
+            --text-main: #FFFFFF;
+            --text-sub: #B3B3B3;
+            --border: #282828;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-black);
+            color: var(--text-main);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Layout */
+        .app-container {
+            display: grid;
+            grid-template-columns: 260px 1fr 300px;
+            grid-template-rows: 1fr 100px;
+            height: 100vh;
+        }
+
+        /* Sidebar & Uploads */
+        .sidebar {
+            background: var(--bg-black);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            border-right: 1px solid var(--border);
+        }
+        .logo { font-size: 1.5rem; font-weight: bold; color: var(--copper); display: flex; align-items: center; gap: 10px; }
+
+        .upload-area { display: flex; flex-direction: column; gap: 10px; }
+        .btn-upload {
+            background: var(--bg-elevated);
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            cursor: pointer;
+            font-size: 0.9rem;
+            border: 1px solid transparent;
+            transition: 0.3s;
+        }
+        .btn-upload:hover { border-color: var(--copper); background: #222; }
+
+        /* Equalizer */
+        .eq-panel { background: #0a0a0a; padding: 15px; border-radius: 12px; }
+        .eq-panel h4 { font-size: 0.75rem; text-transform: uppercase; color: var(--text-sub); margin-bottom: 15px; }
+        .eq-controls { display: flex; justify-content: space-between; height: 100px; }
+        .eq-band { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+        .eq-band input { -webkit-appearance: slider-vertical; width: 4px; height: 70px; background: var(--border); }
+        .eq-band label { font-size: 0.6rem; color: var(--text-sub); }
+
+        /* Main View */
+        .main-view {
+            background: linear-gradient(to bottom, #3d2612, var(--bg-dark));
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            text-align: center;
+        }
+        .album-art-large {
+            width: 300px; height: 300px;
+            border-radius: 50%;
+            background: #111;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+            margin-bottom: 30px;
+            border: 8px solid #1a1a1a;
+            overflow: hidden;
+            animation: spin 20s linear infinite;
+            animation-play-state: paused;
+        }
+        .album-art-large.playing { animation-play-state: running; }
+        .album-art-large img { width: 100%; height: 100%; object-fit: cover; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+        /* Queue */
+        .queue-panel { background: var(--bg-black); padding: 20px; overflow-y: auto; border-left: 1px solid var(--border); }
+        .queue-item {
+            display: flex; align-items: center; gap: 12px; padding: 10px;
+            border-radius: 6px; cursor: pointer; margin-bottom: 4px;
+        }
+        .queue-item:hover { background: var(--bg-elevated); }
+        .queue-item.active { background: rgba(184, 115, 51, 0.15); }
+        .queue-item.active .q-title { color: var(--copper); }
+        .q-img { width: 40px; height: 40px; border-radius: 4px; background: #222; }
+        .q-info { overflow: hidden; }
+        .q-title { font-size: 0.85rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        /* Bottom Player Bar */
+        .player-bar {
+            grid-column: 1 / span 3;
+            background: var(--bg-elevated);
+            border-top: 1px solid var(--border);
+            display: grid;
+            grid-template-columns: 300px 1fr 300px;
+            align-items: center;
+            padding: 0 20px;
+        }
+        .now-playing { display: flex; align-items: center; gap: 15px; }
+        .mini-art { width: 56px; height: 56px; border-radius: 4px; background: #222; }
+
+        .central-controls { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+        .playback-btns { display: flex; align-items: center; gap: 25px; }
+        .btn-main { background: var(--text-main); color: black; width: 35px; height: 35px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: none; cursor: pointer; }
+        .btn-sec { background: none; border: none; color: var(--text-sub); font-size: 1.2rem; cursor: pointer; }
+
+        .progress-container { width: 100%; display: flex; align-items: center; gap: 10px; font-size: 0.75rem; color: var(--text-sub); }
+        input[type="range"] { flex: 1; accent-color: var(--copper); cursor: pointer; }
+
+        .volume-zone { display: flex; justify-content: flex-end; align-items: center; gap: 10px; color: var(--text-sub); }
+
+        /* Loader */
+        #loader {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); z-index: 9999;
+            display: none; flex-direction: column; align-items: center; justify-content: center;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="loader">
+        <i class="fas fa-compact-disc fa-spin" style="font-size: 3rem; color: var(--copper); margin-bottom: 20px;"></i>
+        <p id="load-status">Processing Tracks...</p>
+    </div>
+
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="logo"><i class="fas fa-record-vinyl"></i> CopperMusic</div>
+
+            <div class="upload-area">
+                <label class="btn-upload">
+                    <i class="fas fa-file-audio"></i> Add Files
+                    <input type="file" id="file-input" multiple accept="audio/*" hidden>
+                </label>
+                <label class="btn-upload">
+                    <i class="fas fa-folder-open"></i> Add Folder
+                    <input type="file" id="folder-input" webkitdirectory hidden>
+                </label>
+            </div>
+
+            <div class="eq-panel">
+                <h4>Equalizer</h4>
+                <div class="eq-controls">
+                    <div class="eq-band">
+                        <input type="range" class="eq-slider" data-filter="0" min="-12" max="12" value="0">
+                        <label>Bass</label>
+                    </div>
+                    <div class="eq-band">
+                        <input type="range" class="eq-slider" data-filter="1" min="-12" max="12" value="0">
+                        <label>Mid</label>
+                    </div>
+                    <div class="eq-band">
+                        <input type="range" class="eq-slider" data-filter="2" min="-12" max="12" value="0">
+                        <label>Treble</label>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <main class="main-view">
+            <div class="album-art-large" id="art-container">
+                <img id="main-art" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7">
+            </div>
+            <h1 id="display-title">Welcome to Copper</h1>
+            <p id="display-artist" style="color: var(--text-sub); margin-top: 10px;">Select music to begin</p>
+        </main>
+
+        <section class="queue-panel">
+            <h3 style="margin-bottom: 15px; font-size: 0.9rem;">Next Up</h3>
+            <div id="queue-list"></div>
+        </section>
+
+        <footer class="player-bar">
+            <div class="now-playing">
+                <img class="mini-art" id="mini-art" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7">
+                <div class="q-info">
+                    <div class="q-title" id="bar-title">No Track</div>
+                    <div style="font-size: 0.7rem; color: var(--text-sub);" id="bar-artist">Artist</div>
+                </div>
+            </div>
+
+            <div class="central-controls">
+                <div class="playback-btns">
+                    <button class="btn-sec" id="prev"><i class="fas fa-step-backward"></i></button>
+                    <button class="btn-main" id="play-trigger"><i class="fas fa-play" id="play-icon"></i></button>
+                    <button class="btn-sec" id="next"><i class="fas fa-step-forward"></i></button>
+                </div>
+                <div class="progress-container">
+                    <span id="time-cur">0:00</span>
+                    <input type="range" id="seek-bar" value="0" max="100">
+                    <span id="time-dur">0:00</span>
+                </div>
+            </div>
+
+            <div class="volume-zone">
+                <i class="fas fa-volume-up"></i>
+                <input type="range" id="vol-bar" value="80" max="100" style="max-width: 100px;">
+            </div>
+        </footer>
+    </div>
+
+    <audio id="core-audio"></audio>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js"></script>
+
+    <script>
+        const audio = document.getElementById('core-audio');
+        const loader = document.getElementById('loader');
+        const queueList = document.getElementById('queue-list');
+
+        let playlist = [];
+        let currentIndex = 0;
+        let audioCtx, source, filters = [];
+
+        // --- Audio Context Setup ---
+        function initAudioEngine() {
+            if (audioCtx) return;
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            source = audioCtx.createMediaElementSource(audio);
+
+            // EQ Setup (Low, Mid, High)
+            const freqs = [100, 1000, 10000];
+            let lastNode = source;
+
+            freqs.forEach((f, i) => {
+                const filter = audioCtx.createBiquadFilter();
+                filter.type = (i === 0) ? 'lowshelf' : (i === 2) ? 'highshelf' : 'peaking';
+                filter.frequency.value = f;
+                filter.gain.value = 0;
+                lastNode.connect(filter);
+                lastNode = filter;
+                filters.push(filter);
+            });
+
+            lastNode.connect(audioCtx.destination);
+        }
+
+        // --- Metadata & File Loading ---
+        async function processFiles(files) {
+            loader.style.display = 'flex';
+            const audioFiles = Array.from(files).filter(f => f.type.startsWith('audio/'));
+
+            for (const file of audioFiles) {
+                const meta = await getMetadata(file);
+                playlist.push({ file, meta, url: URL.createObjectURL(file) });
+            }
+
+            renderQueue();
+            if (playlist.length > 0 && audio.paused) loadTrack(0);
+            loader.style.display = 'none';
+        }
+
+        function getMetadata(file) {
+            return new Promise((resolve) => {
+                jsmediatags.read(file, {
+                    onSuccess: (tag) => {
+                        let art = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+                        if (tag.tags.picture) {
+                            const { data, format } = tag.tags.picture;
+                            let base64String = "";
+                            for (let i = 0; i < data.length; i++) base64String += String.fromCharCode(data[i]);
+                            art = `data:${format};base64,${window.btoa(base64String)}`;
+                        }
+                        resolve({
+                            title: tag.tags.title || file.name,
+                            artist: tag.tags.artist || "Unknown Artist",
+                            art: art
+                        });
+                    },
+                    onError: () => resolve({ title: file.name, artist: "Unknown", art: "" })
+                });
+            });
+        }
+
+        // --- Core Player Logic ---
+        function loadTrack(index) {
+            if (index < 0 || index >= playlist.length) return;
+            currentIndex = index;
+            const track = playlist[index];
+
+            audio.src = track.url;
+
+            // Update UI
+            document.getElementById('display-title').innerText = track.meta.title;
+            document.getElementById('display-artist').innerText = track.meta.artist;
+            document.getElementById('bar-title').innerText = track.meta.title;
+            document.getElementById('bar-artist').innerText = track.meta.artist;
+            document.getElementById('main-art').src = track.meta.art;
+            document.getElementById('mini-art').src = track.meta.art;
+
+            renderQueue();
+            togglePlay(true);
+        }
+
+        function togglePlay(forcePlay = false) {
+            initAudioEngine();
+            const icon = document.getElementById('play-icon');
+            const art = document.getElementById('art-container');
+
+            if (audio.paused || forcePlay) {
+                audio.play();
+                icon.className = 'fas fa-pause';
+                art.classList.add('playing');
+            } else {
+                audio.pause();
+                icon.className = 'fas fa-play';
+                art.classList.remove('playing');
+            }
+        }
+
+        function renderQueue() {
+            queueList.innerHTML = '';
+            playlist.forEach((track, i) => {
+                const item = document.createElement('div');
+                item.className = `queue-item ${i === currentIndex ? 'active' : ''}`;
+                item.innerHTML = `
+                    <img src="${track.meta.art}" class="q-img">
+                    <div class="q-info">
+                        <div class="q-title">${track.meta.title}</div>
+                    </div>
+                `;
+                item.onclick = () => loadTrack(i);
+                queueList.appendChild(item);
+            });
+        }
+
+        // --- Events ---
+        document.getElementById('play-trigger').onclick = () => togglePlay();
+        document.getElementById('next').onclick = () => loadTrack((currentIndex + 1) % playlist.length);
+        document.getElementById('prev').onclick = () => loadTrack((currentIndex - 1 + playlist.length) % playlist.length);
+
+        document.getElementById('file-input').onchange = (e) => processFiles(e.target.files);
+        document.getElementById('folder-input').onchange = (e) => processFiles(e.target.files);
+
+        audio.ontimeupdate = () => {
+            const progress = (audio.currentTime / audio.duration) * 100;
+            document.getElementById('seek-bar').value = progress || 0;
+            document.getElementById('time-cur').innerText = formatTime(audio.currentTime);
+            document.getElementById('time-dur').innerText = formatTime(audio.duration || 0);
+        };
+
+        document.getElementById('seek-bar').oninput = (e) => {
+            audio.currentTime = (e.target.value / 100) * audio.duration;
+        };
+
+        document.getElementById('vol-bar').oninput = (e) => audio.volume = e.target.value / 100;
+
+        document.querySelectorAll('.eq-slider').forEach(slider => {
+            slider.oninput = (e) => {
+                const id = e.target.dataset.filter;
+                if (filters[id]) filters[id].gain.value = e.target.value;
+            };
+        });
+
+        audio.onended = () => loadTrack((currentIndex + 1) % playlist.length);
+
+        function formatTime(s) {
+            const mins = Math.floor(s / 60);
+            const secs = Math.floor(s % 60);
+            return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+        }
+    </script>
+</body>
+</html>
