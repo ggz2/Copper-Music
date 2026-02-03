@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Copper Music</title>
+<link rel="icon" href="https://static.wikia.nocookie.net/minecraft_gamepedia/images/8/86/Copper_Block_JE1_BE1.png">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+:root {
+  --copper:#b87333;
+  --bg:#000;
+  --panel:#121212;
+  --panel2:#181818;
+  --text:#fff;
+  --sub:#aaa;
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui;background:var(--bg);color:var(--text);height:100vh;overflow:hidden}
+
+.app{
+  display:grid;
+  grid-template-columns:240px 1fr 280px;
+  grid-template-rows:1fr 90px;
+  height:100vh;
+}
+
+.sidebar{
+  background:#000;
+  padding:20px;
+  display:flex;
+  flex-direction:column;
+  gap:15px;
+}
+
+.logo{font-size:1.2rem;font-weight:700}
+.upload{background:var(--panel2);padding:10px;border-radius:6px;text-align:center;cursor:pointer}
+
+.eq{
+  background:#111;
+  padding:10px;
+  border-radius:8px;
+}
+.eq h4{font-size:.75rem;color:var(--sub);margin-bottom:6px}
+.eq-row{display:flex;justify-content:space-between;text-align:center}
+.eq-col{font-size:.65rem}
+.eq input{writing-mode:bt-lr;-webkit-appearance:slider-vertical;height:60px}
+
+.main{
+  background:linear-gradient(#2a1500,#121212);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-direction:column;
+  gap:20px;
+}
+
+.album{
+  width:280px;height:280px;border-radius:50%;
+  background:#111;
+  display:flex;align-items:center;justify-content:center;
+}
+.album img{width:95%;height:95%;border-radius:50%}
+
+.queue{
+  background:#000;
+  padding:15px;
+  overflow:auto;
+}
+.queue h3{margin-bottom:10px}
+.queue-item{padding:8px;border-radius:5px;cursor:pointer}
+.queue-item.active{background:rgba(184,115,51,.2)}
+
+.player{
+  grid-column:1/4;
+  background:#181818;
+  display:grid;
+  grid-template-columns:280px 1fr 280px;
+  align-items:center;
+  padding:10px 15px;
+}
+
+.controls{text-align:center}
+.controls button{
+  background:none;border:none;color:white;
+  font-size:1.1rem;margin:0 10px;cursor:pointer
+}
+.play{background:white;color:black;border-radius:50%;width:32px;height:32px}
+
+.progress{
+  display:flex;align-items:center;gap:10px
+}
+.progress input{flex:1}
+
+.volume{text-align:right}
+</style>
+</head>
+
+<body>
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="logo">🟫 CopperMusic</div>
+
+    <label class="upload">
+      Upload Files
+      <input type="file" id="files" multiple accept="audio/*" hidden>
+    </label>
+
+    <label class="upload">
+      Upload Folder
+      <input type="file" id="folder" webkitdirectory hidden>
+    </label>
+
+    <div class="eq">
+      <h4>Equalizer</h4>
+      <div class="eq-row">
+        <div class="eq-col">
+          <input type="range" min="-12" max="12" value="0" id="bass">
+          <div>Bass</div><div id="bassVal">0</div>
+        </div>
+        <div class="eq-col">
+          <input type="range" min="-12" max="12" value="0" id="mid">
+          <div>Mid</div><div id="midVal">0</div>
+        </div>
+        <div class="eq-col">
+          <input type="range" min="-12" max="12" value="0" id="treble">
+          <div>Treble</div><div id="trebleVal">0</div>
+        </div>
+      </div>
+      <button onclick="resetEQ()">Reset EQ</button>
+
+      <h4 style="margin-top:10px">Crossfade</h4>
+      <input type="range" min="0" max="20" value="5" id="fade">
+      <div><span id="fadeVal">5</span>s</div>
+      <button onclick="resetFade()">Reset Fade</button>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="album">
+      <img id="art">
+    </div>
+    <h2 id="title">Ready for music</h2>
+    <p id="artist">Upload files or folders</p>
+  </div>
+
+  <!-- QUEUE -->
+  <div class="queue">
+    <h3>Queue</h3>
+    <div id="queue"></div>
+  </div>
+
+  <!-- PLAYER BAR -->
+  <div class="player">
+    <div>
+      <strong id="miniTitle">No track</strong>
+    </div>
+
+    <div class="controls">
+      <button onclick="prev()">⏮</button>
+      <button class="play" onclick="toggle()">▶</button>
+      <button onclick="next()">⏭</button>
+      <div class="progress">
+        <span id="time">0:00</span>
+        <input type="range" id="seek" value="0">
+        <span id="dur">0:00</span>
+      </div>
+    </div>
+
+    <div class="volume">
+      🔊 <input type="range" id="vol" value="100">
+    </div>
+  </div>
+</div>
+
+<audio id="audio"></audio>
+
+<script>
+const audio=document.getElementById("audio")
+let tracks=[],index=0
+
+files.onchange=e=>load(e.target.files)
+folder.onchange=e=>load(e.target.files)
+
+function load(files){
+  for(let f of files){
+    if(f.type.startsWith("audio")){
+      tracks.push({file:f,url:URL.createObjectURL(f)})
+    }
+  }
+  render()
+  if(tracks.length===files.length) play(0)
+}
+
+function render(){
+  queue.innerHTML=""
+  tracks.forEach((t,i)=>{
+    let d=document.createElement("div")
+    d.className="queue-item"+(i===index?" active":"")
+    d.textContent=t.file.name
+    d.onclick=()=>play(i)
+    queue.appendChild(d)
+  })
+}
+
+function play(i){
+  index=i
+  audio.src=tracks[i].url
+  audio.play()
+  title.textContent=tracks[i].file.name
+  miniTitle.textContent=tracks[i].file.name
+  render()
+}
+
+function toggle(){audio.paused?audio.play():audio.pause()}
+function next(){if(index<tracks.length-1)play(index+1)}
+function prev(){if(index>0)play(index-1)}
+
+audio.ontimeupdate=()=>{
+  seek.max=audio.duration||0
+  seek.value=audio.currentTime
+  time.textContent=format(audio.currentTime)
+  dur.textContent=format(audio.duration)
+}
+
+seek.oninput=()=>audio.currentTime=seek.value
+vol.oninput=()=>audio.volume=vol.value/100
+
+function format(t){if(!t)return"0:00";return Math.floor(t/60)+":"+String(Math.floor(t%60)).padStart(2,"0")}
+
+bass.oninput=()=>bassVal.textContent=bass.value
+mid.oninput=()=>midVal.textContent=mid.value
+treble.oninput=()=>trebleVal.textContent=treble.value
+fade.oninput=()=>fadeVal.textContent=fade.value
+
+function resetEQ(){
+  bass.value=mid.value=treble.value=0
+  bassVal.textContent=midVal.textContent=trebleVal.textContent=0
+}
+function resetFade(){
+  fade.value=5
+  fadeVal.textContent=5
+}
+</script>
+</body>
+</html>
