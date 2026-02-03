@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Copper Music Pro</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js"></script>
+  <style>
+    :root {
+      --copper: #b87333;
+      --copper-bright: #e38e44;
+      --bg-black: #050505;
+      --bg-panel: #111111;
+      --text-main: #ffffff;
+      --text-sub: #888888;
+      --border: #222;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; outline: none; }
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background-color: var(--bg-black);
+      color: var(--text-main);
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* --- LOADING SCREEN --- */
+    #loading-screen {
+      position: fixed; inset: 0; background: var(--bg-black);
+      z-index: 9999; display: flex; flex-direction: column;
+      justify-content: center; align-items: center; transition: opacity 0.5s;
+    }
+    .loader-icon { font-size: 50px; color: var(--copper); margin-bottom: 20px; animation: spin 2s linear infinite; }
+    .load-text { font-family: monospace; color: var(--copper); margin-bottom: 10px; }
+    .load-bar-wrap { width: 250px; height: 4px; background: #222; border-radius: 2px; overflow: hidden; }
+    #load-bar-fill { width: 0%; height: 100%; background: var(--copper); transition: width 0.1s; }
+
+    /* --- LAYOUT --- */
+    .app-grid {
+      display: grid;
+      grid-template-columns: 280px 1fr 300px;
+      grid-template-rows: 1fr 100px;
+      height: 100vh;
+    }
+
+    /* --- SIDEBAR & LIBRARY --- */
+    .sidebar { background: var(--bg-black); border-right: 1px solid var(--border); padding: 20px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; }
+    .logo { font-size: 1.5rem; font-weight: 800; color: var(--text-main); display: flex; align-items: center; gap: 10px; }
+    .logo i { color: var(--copper); }
+
+    .btn-upload {
+      background: var(--bg-panel); border: 1px solid var(--border); color: #fff;
+      padding: 12px; border-radius: 8px; cursor: pointer; text-align: center;
+      transition: 0.3s; display: block;
+    }
+    .btn-upload:hover { border-color: var(--copper); color: var(--copper); }
+
+    .lib-section { flex: 1; }
+    .section-label { font-size: 11px; text-transform: uppercase; color: var(--text-sub); letter-spacing: 1.5px; margin-bottom: 12px; display: flex; justify-content: space-between; }
+    .folder-item { 
+      padding: 8px 12px; border-radius: 6px; cursor: pointer; color: #ccc; font-size: 14px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px;
+    }
+    .folder-item:hover { background: #1a1a1a; }
+    .folder-item.active { background: rgba(184, 115, 51, 0.15); color: var(--copper); font-weight: 600; }
+
+    /* --- EQ VERTICAL --- */
+    .eq-box { background: var(--bg-panel); padding: 15px; border-radius: 12px; border: 1px solid var(--border); }
+    .eq-grid { display: flex; justify-content: space-between; height: 120px; margin-top: 10px; }
+    .eq-channel { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+    .eq-channel input[type=range] {
+      -webkit-appearance: slider-vertical; width: 8px; height: 80px; accent-color: var(--copper);
+    }
+    .val-tag { font-family: monospace; font-size: 10px; color: var(--copper); }
+
+    /* --- MAIN PLAYER --- */
+    .main-stage {
+      background: radial-gradient(circle at center, #1a100a 0%, #050505 100%);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+    }
+    .vinyl-wrap {
+      width: 350px; height: 350px; border-radius: 50%; background: #000; padding: 15px;
+      box-shadow: 0 30px 60px rgba(0,0,0,0.8); margin-bottom: 40px; position: relative;
+    }
+    .vinyl-inner {
+      width: 100%; height: 100%; border-radius: 50%; overflow: hidden;
+      border: 3px solid #1a1a1a; animation: spin 20s linear infinite; animation-play-state: paused;
+    }
+    .vinyl-inner.playing { animation-play-state: running; }
+    #art-main { width: 100%; height: 100%; object-fit: cover; }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+    /* --- QUEUE --- */
+    .queue-area { background: var(--bg-black); border-left: 1px solid var(--border); padding: 20px; overflow-y: auto; }
+    .q-item {
+      display: flex; align-items: center; gap: 12px; padding: 8px; border-radius: 6px; cursor: pointer; margin-bottom: 4px;
+    }
+    .q-item:hover { background: #111; }
+    .q-item.active { background: #1a1a1a; border-left: 3px solid var(--copper); }
+    .q-thumb { width: 40px; height: 40px; border-radius: 4px; object-fit: cover; }
+
+    /* --- PLAYER BAR --- */
+    .player-bar {
+      grid-column: 1 / -1; background: #080808; border-top: 1px solid var(--border);
+      display: grid; grid-template-columns: 280px 1fr 300px; align-items: center; padding: 0 25px;
+    }
+    .mini-info { display: flex; align-items: center; gap: 15px; }
+    .mini-art { width: 55px; height: 55px; border-radius: 4px; object-fit: cover; }
+
+    .center-controls { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+    .playback-btns { display: flex; align-items: center; gap: 25px; }
+    .btn-main { background: none; border: none; color: #777; font-size: 1.2rem; cursor: pointer; transition: 0.2s; }
+    .btn-main:hover { color: #fff; }
+    .btn-main.active { color: var(--copper); }
+    .play-btn { background: #fff; color: #000; width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1rem;}
+
+    .progress-row { display: flex; align-items: center; gap: 12px; width: 100%; max-width: 600px; font-family: monospace; font-size: 11px; color: #555; }
+    input[type=range] { accent-color: var(--copper); cursor: pointer; height: 4px; width: 100%; }
+
+    /* Generic button styles */
+    .btn-reset { font-size: 10px; color: var(--copper); background: none; border: 1px solid var(--copper); padding: 2px 6px; border-radius: 4px; cursor: pointer; }
+
+  </style>
+</head>
+<body>
+
+<div id="loading-screen">
+  <div class="loader-icon"><i class="fas fa-compact-disc"></i></div>
+  <div class="load-text" id="load-msg">Initializing CopperDB...</div>
+  <div class="load-bar-wrap"><div id="load-bar-fill"></div></div>
+</div>
+
+<div class="app-grid">
+  <div class="sidebar">
+    <div class="logo"><i class="fas fa-layer-group"></i> Copper Music</div>
+
+    <label class="btn-upload">
+      <i class="fas fa-plus"></i> Import Folders
+      <input type="file" id="folder-input" webkitdirectory directory multiple hidden>
+    </label>
+
+    <div class="lib-section">
+      <div class="section-label">Library</div>
+      <div id="folder-list">
+        <div class="folder-item active" onclick="setFolderView('All')">All Tracks</div>
+      </div>
+    </div>
+
+    <div class="eq-box">
+      <div class="section-label">Equalizer <button class="btn-reset" onclick="resetEQ()">RESET</button></div>
+      <div class="eq-grid">
+        <div class="eq-channel">
+          <span class="val-tag" id="tag-low">0dB</span>
+          <input type="range" class="eq-fader" data-band="low" min="-12" max="12" value="0">
+          <span class="section-label" style="margin:0; font-size:9px;">Low</span>
+        </div>
+        <div class="eq-channel">
+          <span class="val-tag" id="tag-mid">0dB</span>
+          <input type="range" class="eq-fader" data-band="mid" min="-12" max="12" value="0">
+          <span class="section-label" style="margin:0; font-size:9px;">Mid</span>
+        </div>
+        <div class="eq-channel">
+          <span class="val-tag" id="tag-high">0dB</span>
+          <input type="range" class="eq-fader" data-band="high" min="-12" max="12" value="0">
+          <span class="section-label" style="margin:0; font-size:9px;">High</span>
+        </div>
+      </div>
+      <div style="margin-top:20px;">
+        <div class="section-label">Crossfade <span class="val-tag" id="tag-xfade">0s</span></div>
+        <input type="range" id="xfade-range" min="0" max="10" value="0">
+      </div>
+    </div>
+
+    <button class="btn-upload" style="margin-top:10px; border-color:#442222;" onclick="clearDatabase()">
+      <i class="fas fa-trash"></i> Clear Cache
+    </button>
+  </div>
+
+  <div class="main-stage">
+    <div class="vinyl-wrap">
+      <div class="vinyl-inner" id="vinyl-disk">
+        <img id="art-main" src="https://static.wikia.nocookie.net/minecraft_gamepedia/images/8/86/Copper_Block_JE1_BE1.png">
+      </div>
+    </div>
+    <div style="text-align:center">
+      <h1 id="main-title" style="font-size: 2.5rem; margin-bottom: 10px;">Copper Pro</h1>
+      <p id="main-artist" style="color: var(--copper); font-size: 1.2rem; font-weight: 500;">Ready to play</p>
+    </div>
+  </div>
+
+  <div class="queue-area">
+    <div class="section-label">Up Next</div>
+    <div id="queue-list"></div>
+  </div>
+
+  <div class="player-bar">
+    <div class="mini-info">
+      <img id="art-mini" class="mini-art" src="https://static.wikia.nocookie.net/minecraft_gamepedia/images/8/86/Copper_Block_JE1_BE1.png">
+      <div style="overflow:hidden">
+        <div id="mini-title" style="font-size:14px; font-weight:600; white-space:nowrap; text-overflow:ellipsis; overflow:hidden;">No Track</div>
+        <div id="mini-artist" style="font-size:12px; color:var(--text-sub);">Offline</div>
+      </div>
+    </div>
+
+    <div class="center-controls">
+      <div class="playback-btns">
+        <button class="btn-main" id="shuffle-btn" onclick="cycleShuffleMode()" title="Shuffle Mode"><i class="fas fa-random"></i></button>
+        <button class="btn-main" onclick="changeTrack(-1)"><i class="fas fa-step-backward"></i></button>
+        <button class="btn-main play-btn" id="play-trigger" onclick="togglePlay()"><i class="fas fa-play"></i></button>
+        <button class="btn-main" onclick="changeTrack(1)"><i class="fas fa-step-forward"></i></button>
+        <button class="btn-main" id="loop-btn" onclick="toggleLoop()"><i class="fas fa-redo"></i></button>
+      </div>
+      <div class="progress-row">
+        <span id="time-cur">0:00</span>
+        <input type="range" id="seek-bar" min="0" value="0" step="0.1">
+        <span id="time-dur">0:00</span>
+      </div>
+    </div>
+
+    <div style="display:flex; justify-content:flex-end; align-items:center; gap:12px;">
+      <i class="fas fa-volume-down" style="color:#444"></i>
+      <input type="range" id="vol-range" min="0" max="1" step="0.01" value="0.8" style="width:100px;">
+    </div>
+  </div>
+</div>
+
+<audio id="audio-engine" crossorigin="anonymous"></audio>
+
+<script>
+  /* --- DB & ENGINE VARS --- */
+  let db;
+  const audio = document.getElementById('audio-engine');
+  let library = []; 
+  let currentQueue = [];
+  let currentIndex = 0;
+  let folders = new Set();
+  let shuffleMode = 'none'; // 'none', 'true', 'smart'
+  let isPlaying = false;
+  let crossfadeSec = 0;
+
+  // Web Audio Nodes
+  let aCtx, source, lowNode, midNode, highNode, gainNode;
+
+  /* --- INDEXED DB INIT --- */
+  const dbReq = indexedDB.open("CopperMusicDB", 1);
+  dbReq.onupgradeneeded = (e) => {
+    db = e.target.result;
+    db.createObjectStore("songs", { keyPath: "id", autoIncrement: true });
+  };
+  dbReq.onsuccess = (e) => {
+    db = e.target.result;
+    loadLibraryFromDB();
+  };
+
+  /* --- CORE AUDIO LOGIC --- */
+  function initAudioNodes() {
+    if (aCtx) return;
+    aCtx = new (window.AudioContext || window.webkitAudioContext)();
+    source = aCtx.createMediaElementSource(audio);
+    lowNode = aCtx.createBiquadFilter(); lowNode.type = 'lowshelf'; lowNode.frequency.value = 250;
+    midNode = aCtx.createBiquadFilter(); midNode.type = 'peaking'; midNode.frequency.value = 1000;
+    highNode = aCtx.createBiquadFilter(); highNode.type = 'highshelf'; highNode.frequency.value = 4000;
+    gainNode = aCtx.createGain();
+    source.connect(lowNode).connect(midNode).connect(highNode).connect(gainNode).connect(aCtx.destination);
+  }
+
+  /* --- FILE & DATABASE HANDLING --- */
+  document.getElementById('folder-input').onchange = async (e) => {
+    const files = Array.from(e.target.files).filter(f => f.type.startsWith('audio'));
+    if (!files.length) return;
+
+    showLoader(true, "Caching tracks to CopperDB...");
+    const transaction = db.transaction("songs", "readwrite");
+    const store = transaction.objectStore("songs");
+
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      const pathParts = f.webkitRelativePath.split('/');
+      const folderName = pathParts.length > 1 ? pathParts[pathParts.length - 2] : "Root";
+
+      const meta = await getMeta(f);
+      const songData = { ...meta, folder: folderName, blob: f };
+      store.add(songData);
+
+      updateLoadBar(((i + 1) / files.length) * 100);
+    }
+
+    transaction.oncomplete = () => {
+      loadLibraryFromDB();
+      showLoader(false);
+    };
+  };
+
+  async function loadLibraryFromDB() {
+    const transaction = db.transaction("songs", "readonly");
+    const store = transaction.objectStore("songs");
+    const req = store.getAll();
+
+    req.onsuccess = () => {
+      library = req.result;
+      if (library.length > 0) {
+        processLibrary();
+        setFolderView('All');
+      } else {
+        showLoader(false);
+      }
+    };
+  }
+
+  function processLibrary() {
+    folders.clear();
+    library.forEach(s => folders.add(s.folder));
+    const list = document.getElementById('folder-list');
+    list.innerHTML = `<div class="folder-item active" onclick="setFolderView('All')">All Tracks</div>`;
+    folders.forEach(f => {
+      list.innerHTML += `<div class="folder-item" onclick="setFolderView('${f}', this)">${f}</div>`;
+    });
+  }
+
+  function setFolderView(folder, el) {
+    if (el) {
+      document.querySelectorAll('.folder-item').forEach(i => i.classList.remove('active'));
+      el.classList.add('active');
+    }
+    currentQueue = folder === 'All' ? [...library] : library.filter(s => s.folder === folder);
+    applyShuffleLogic();
+    renderQueue();
+  }
+
+  /* --- SHUFFLE ENGINE --- */
+  function cycleShuffleMode() {
+    const btn = document.getElementById('shuffle-btn');
+    if (shuffleMode === 'none') {
+      shuffleMode = 'true';
+      btn.innerHTML = '<i class="fas fa-random"></i>';
+      btn.style.color = 'var(--copper)';
+      btn.title = "True Shuffle";
+    } else if (shuffleMode === 'true') {
+      shuffleMode = 'smart';
+      btn.innerHTML = '<i class="fas fa-layer-group"></i>';
+      btn.style.color = 'var(--copper-bright)';
+      btn.title = "Smart Shuffle (Clustered)";
+    } else {
+      shuffleMode = 'none';
+      btn.innerHTML = '<i class="fas fa-random"></i>';
+      btn.style.color = '#777';
+      btn.title = "Shuffle Off";
+    }
+    applyShuffleLogic();
+    renderQueue();
+  }
+
+  function applyShuffleLogic() {
+    if (shuffleMode === 'true') {
+      for (let i = currentQueue.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [currentQueue[i], currentQueue[j]] = [currentQueue[j], currentQueue[i]];
+      }
+    } else if (shuffleMode === 'smart') {
+      // Group by folder
+      const groups = {};
+      currentQueue.forEach(s => {
+        if (!groups[s.folder]) groups[s.folder] = [];
+        groups[s.folder].push(s);
+      });
+      // Shuffle group keys
+      const keys = Object.keys(groups).sort(() => Math.random() - 0.5);
+      currentQueue = [];
+      keys.forEach(k => currentQueue.push(...groups[k]));
+    }
+    // If none, it stays sorted by the order loaded from DB
+  }
+
+  /* --- PLAYBACK --- */
+  function playTrack(idx) {
+    initAudioNodes();
+    currentIndex = idx;
+    const song = currentQueue[currentIndex];
+
+    // Create local URL for the blob
+    if (audio.src) URL.revokeObjectURL(audio.src);
+    audio.src = URL.createObjectURL(song.blob);
+
+    document.getElementById('main-title').innerText = song.title;
+    document.getElementById('main-artist').innerText = song.artist;
+    document.getElementById('mini-title').innerText = song.title;
+    document.getElementById('mini-artist').innerText = song.artist;
+    document.getElementById('art-main').src = song.art;
+    document.getElementById('art-mini').src = song.art;
+
+    play();
+    renderQueue();
+    updateMediaSession(song);
+  }
+
+  function togglePlay() { isPlaying ? pause() : play(); }
+  function play() { 
+    if(!audio.src) return;
+    audio.play(); isPlaying = true;
+    document.getElementById('play-trigger').innerHTML = '<i class="fas fa-pause"></i>';
+    document.getElementById('vinyl-disk').classList.add('playing');
+  }
+  function pause() {
+    audio.pause(); isPlaying = false;
+    document.getElementById('play-trigger').innerHTML = '<i class="fas fa-play"></i>';
+    document.getElementById('vinyl-disk').classList.remove('playing');
+  }
+
+  function changeTrack(dir) {
+    let newIdx = currentIndex + dir;
+    if (newIdx >= currentQueue.length) newIdx = 0;
+    if (newIdx < 0) newIdx = currentQueue.length - 1;
+    playTrack(newIdx);
+  }
+
+  /* --- KEYBOARD & CONTROLS --- */
+  window.addEventListener('keydown', (e) => {
+    const k = e.key.toLowerCase();
+    if (k === ' ' || k === 'k') { e.preventDefault(); togglePlay(); }
+    if (e.shiftKey && k === 'l') changeTrack(1);
+    if (e.shiftKey && k === 'j') changeTrack(-1);
+    if (!e.shiftKey && k === 'l') audio.currentTime += 15;
+    if (!e.shiftKey && k === 'j') audio.currentTime -= 15;
+    if (k === 'm') audio.muted = !audio.muted;
+  });
+
+  document.querySelectorAll('.eq-fader').forEach(f => {
+    f.oninput = (e) => {
+      const b = e.target.dataset.band;
+      const v = e.target.value;
+      document.getElementById(`tag-${b}`).innerText = `${v}dB`;
+      if(b === 'low') lowNode.gain.value = v;
+      if(b === 'mid') midNode.gain.value = v;
+      if(b === 'high') highNode.gain.value = v;
+    };
+  });
+
+  document.getElementById('xfade-range').oninput = (e) => {
+    crossfadeSec = parseInt(e.target.value);
+    document.getElementById('tag-xfade').innerText = `${crossfadeSec}s`;
+  };
+
+  function resetEQ() {
+    document.querySelectorAll('.eq-fader').forEach(f => { f.value = 0; f.oninput({target:f}); });
+  }
+
+  function clearDatabase() {
+    if(confirm("Delete all cached music?")) {
+      const req = indexedDB.deleteDatabase("CopperMusicDB");
+      req.onsuccess = () => location.reload();
+    }
+  }
+
+  /* --- UTILS --- */
+  function renderQueue() {
+    const list = document.getElementById('queue-list');
+    list.innerHTML = "";
+    currentQueue.forEach((s, i) => {
+      const div = document.createElement('div');
+      div.className = `q-item ${i === currentIndex ? 'active' : ''}`;
+      div.innerHTML = `<img src="${s.art}" class="q-thumb"><div><div style="font-size:13px">${s.title}</div><div style="font-size:10px; color:#555">${s.artist}</div></div>`;
+      div.onclick = () => playTrack(i);
+      list.appendChild(div);
+    });
+  }
+
+  function getMeta(file) {
+    return new Promise(res => {
+      jsmediatags.read(file, {
+        onSuccess: (t) => {
+          let art = "https://static.wikia.nocookie.net/minecraft_gamepedia/images/8/86/Copper_Block_JE1_BE1.png";
+          if (t.tags.picture) {
+            const { data, format } = t.tags.picture;
+            let base64 = "";
+            for (let i = 0; i < data.length; i++) base64 += String.fromCharCode(data[i]);
+            art = `data:${format};base64,${window.btoa(base64)}`;
+          }
+          res({ title: t.tags.title || file.name, artist: t.tags.artist || "Unknown Artist", art });
+        },
+        onError: () => res({ title: file.name, artist: "Unknown Artist", art: "https://static.wikia.nocookie.net/minecraft_gamepedia/images/8/86/Copper_Block_JE1_BE1.png" })
+      });
+    });
+  }
+
+  function formatTime(s) {
+    const m = Math.floor(s/60);
+    const sc = Math.floor(s%60);
+    return `${m}:${sc < 10 ? '0' : ''}${sc}`;
+  }
+
+  audio.ontimeupdate = () => {
+    const cur = audio.currentTime;
+    const dur = audio.duration || 0;
+    document.getElementById('seek-bar').max = dur;
+    document.getElementById('seek-bar').value = cur;
+    document.getElementById('time-cur').innerText = formatTime(cur);
+    document.getElementById('time-dur').innerText = formatTime(dur);
+
+    // Crossfade trigger
+    if (crossfadeSec > 0 && dur > 0 && (dur - cur) < crossfadeSec && isPlaying) {
+      gainNode.gain.setValueAtTime(gainNode.gain.value, aCtx.currentTime);
+      gainNode.gain.linearRampToValueAtTime(0, aCtx.currentTime + crossfadeSec);
+      setTimeout(() => {
+        gainNode.gain.value = 1;
+        changeTrack(1);
+      }, crossfadeSec * 1000);
+    }
+  };
+
+  document.getElementById('seek-bar').oninput = (e) => audio.currentTime = e.target.value;
+  document.getElementById('vol-range').oninput = (e) => audio.volume = e.target.value;
+  audio.onended = () => { if(crossfadeSec === 0) changeTrack(1); };
+
+  function showLoader(show, msg) {
+    const s = document.getElementById('loading-screen');
+    s.style.display = show ? 'flex' : 'none';
+    if(msg) document.getElementById('load-msg').innerText = msg;
+  }
+  function updateLoadBar(p) { document.getElementById('load-bar-fill').style.width = p + '%'; }
+
+  function updateMediaSession(s) {
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: s.title, artist: s.artist, artwork: [{ src: s.art, sizes: '512x512', type: 'image/png' }]
+      });
+      navigator.mediaSession.setActionHandler('play', play);
+      navigator.mediaSession.setActionHandler('pause', pause);
+      navigator.mediaSession.setActionHandler('previoustrack', () => changeTrack(-1));
+      navigator.mediaSession.setActionHandler('nexttrack', () => changeTrack(1));
+    }
+  }
+</script>
+</body>
+</html>
