@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Copper Music</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js"></script>
+
+<style>
+/* --- 1. VARIABLES & RESET --- */
+:root {
+  --copper: #b87333;
+  --copper-glow: rgba(184, 115, 51, 0.3);
+  --bg-black: #000000;
+  --bg-panel: #121212;
+  --bg-hover: #1e1e1e;
+  --text-main: #ffffff;
+  --text-sub: #a0a0a0;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: var(--bg-black);
+  color: var(--text-main);
+  height: 100vh;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* --- 2. LAYOUT --- */
+.app-container {
+  display: grid;
+  grid-template-columns: 240px 1fr 280px;
+  grid-template-rows: 1fr 90px;
+  height: 100vh;
+}
+
+/* --- 3. SIDEBAR --- */
+.sidebar {
+  background: var(--bg-black);
+  padding: 20px;
+  border-right: 1px solid #222;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.logo {
+  font-size: 1.4rem;
+  font-weight: bold;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.logo i { color: var(--copper); }
+
+.upload-btn {
+  background: var(--bg-panel);
+  color: var(--text-main);
+  padding: 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: center;
+  font-size: 0.9rem;
+  transition: 0.2s;
+  display: block;
+}
+.upload-btn:hover { background: var(--bg-hover); color: var(--copper); }
+
+/* EQ Section */
+.eq-box {
+  background: var(--bg-panel);
+  padding: 15px;
+  border-radius: 8px;
+  margin-top: auto; /* Push to bottom of sidebar */
+}
+.eq-title { font-size: 0.8rem; color: var(--text-sub); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; }
+.eq-sliders { display: flex; justify-content: space-between; height: 100px; }
+.eq-band { display: flex; flex-direction: column; align-items: center; gap: 5px; flex: 1; }
+.eq-band input {
+  -webkit-appearance: slider-vertical;
+  width: 100%;
+  height: 80%;
+  background: transparent;
+  accent-color: var(--copper);
+}
+.eq-band span { font-size: 0.7rem; color: var(--text-sub); }
+
+/* --- 4. MAIN STAGE --- */
+.main-content {
+  background: linear-gradient(180deg, #2a1500 0%, var(--bg-panel) 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.album-art-container {
+  width: 300px;
+  height: 300px;
+  border-radius: 50%;
+  background: #111;
+  padding: 8px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+  position: relative;
+}
+
+.album-art-wrapper {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 4px solid #222;
+  animation: spin 20s linear infinite;
+  animation-play-state: paused; /* Default paused */
+}
+
+/* Spinning Class */
+.album-art-wrapper.playing { animation-play-state: running; }
+
+@keyframes spin { 100% { transform: rotate(360deg); } }
+
+#main-art { width: 100%; height: 100%; object-fit: cover; }
+
+.track-info-large { text-align: center; margin-top: 30px; }
+.track-info-large h1 { font-size: 2rem; margin-bottom: 8px; }
+.track-info-large p { color: var(--copper); font-size: 1.1rem; }
+
+/* --- 5. QUEUE --- */
+.queue-sidebar {
+  background: var(--bg-black);
+  border-left: 1px solid #222;
+  padding: 20px;
+  overflow-y: auto;
+}
+.queue-header { font-size: 1rem; margin-bottom: 15px; font-weight: bold; }
+.queue-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: 0.2s;
+  border-bottom: 1px solid #1a1a1a;
+}
+.queue-item:hover { background: var(--bg-hover); }
+.queue-item.active { background: var(--copper-glow); border-left: 3px solid var(--copper); }
+.queue-item img { width: 40px; height: 40px; border-radius: 4px; object-fit: cover; background: #333; }
+.q-info { display: flex; flex-direction: column; overflow: hidden; }
+.q-title { font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #fff; }
+.q-artist { font-size: 0.75rem; color: var(--text-sub); }
+
+/* --- 6. PLAYER BAR --- */
+.player-bar {
+  grid-column: 1 / -1;
+  background: #181818;
+  border-top: 1px solid #333;
+  display: grid;
+  grid-template-columns: 300px 1fr 300px;
+  align-items: center;
+  padding: 0 20px;
+  z-index: 10;
+}
+
+/* Mini Info */
+.mini-player { display: flex; align-items: center; gap: 15px; }
+.mini-art { width: 56px; height: 56px; border-radius: 4px; background: #333; object-fit: cover;}
+.mini-text { display: flex; flex-direction: column; justify-content: center; }
+.mini-title { font-size: 0.9rem; font-weight: 600; }
+.mini-artist { font-size: 0.75rem; color: var(--text-sub); }
+
+/* Controls */
+.controls-center { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.buttons { display: flex; align-items: center; gap: 20px; }
+.btn-control { background: none; border: none; color: var(--text-sub); font-size: 1.2rem; cursor: pointer; transition: 0.2s;}
+.btn-control:hover { color: #fff; }
+.btn-play { 
+  background: #fff; color: #000; width: 35px; height: 35px; 
+  border-radius: 50%; display: flex; align-items: center; justify-content: center; 
+  font-size: 1rem; margin: 0 10px;
+}
+.btn-play:hover { transform: scale(1.05); }
+
+/* Progress Bar */
+.progress-area { display: flex; align-items: center; gap: 10px; width: 100%; max-width: 500px; }
+.time-text { font-size: 0.7rem; color: var(--text-sub); width: 35px; text-align: center; }
+input[type="range"] {
+  -webkit-appearance: none;
+  background: transparent;
+  width: 100%;
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  background: #444;
+  border-radius: 2px;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  height: 12px; width: 12px;
+  border-radius: 50%;
+  background: #fff;
+  margin-top: -4px; /* center thumb */
+  box-shadow: 0 0 5px rgba(0,0,0,0.5);
+}
+/* Copper Slider Accent */
+#progress-bar::-webkit-slider-runnable-track {
+    background: linear-gradient(to right, var(--copper) 0%, var(--copper) var(--progress-percent, 0%), #444 var(--progress-percent, 0%));
+}
+
+/* Volume */
+.volume-area { display: flex; justify-content: flex-end; align-items: center; gap: 10px; }
+#vol-slider { width: 100px; }
+
+</style>
+</head>
+<body>
+
+<div class="app-container">
+
+  <div class="sidebar">
+    <div class="logo"><i class="fas fa-compact-disc"></i> CopperMusic</div>
+
+    <label class="upload-btn">
+      <i class="fas fa-folder-open"></i> Upload Folder
+      <input type="file" id="folder-upload" webkitdirectory directory multiple hidden>
+    </label>
+
+    <label class="upload-btn" style="background:#222; margin-top:-10px;">
+      <i class="fas fa-music"></i> Upload Files
+      <input type="file" id="file-upload" accept="audio/*" multiple hidden>
+    </label>
+
+    <div class="eq-box">
+      <div class="eq-title">Copper EQ</div>
+      <div class="eq-sliders">
+        <div class="eq-band">
+          <input type="range" class="eq-control" data-type="low" min="-12" max="12" value="0">
+          <span>Low</span>
+        </div>
+        <div class="eq-band">
+          <input type="range" class="eq-control" data-type="mid" min="-12" max="12" value="0">
+          <span>Mid</span>
+        </div>
+        <div class="eq-band">
+          <input type="range" class="eq-control" data-type="high" min="-12" max="12" value="0">
+          <span>High</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main-content">
+    <div class="album-art-container">
+      <div class="album-art-wrapper" id="album-wrapper">
+        <img id="main-art" src="https://static.wikia.nocookie.net/minecraft_gamepedia/images/8/86/Copper_Block_JE1_BE1.png" alt="Art">
+      </div>
+    </div>
+    <div class="track-info-large">
+      <h1 id="main-title">Welcome</h1>
+      <p id="main-artist">Upload music to begin</p>
+    </div>
+  </div>
+
+  <div class="queue-sidebar">
+    <div class="queue-header">Queue</div>
+    <div id="queue-list"></div>
+  </div>
+
+  <div class="player-bar">
+    <div class="mini-player">
+      <img id="mini-art" class="mini-art" src="https://static.wikia.nocookie.net/minecraft_gamepedia/images/8/86/Copper_Block_JE1_BE1.png">
+      <div class="mini-text">
+        <div id="mini-title" class="mini-title">No Track</div>
+        <div id="mini-artist" class="mini-artist">-</div>
+      </div>
+    </div>
+
+    <div class="controls-center">
+      <div class="buttons">
+        <button class="btn-control" id="prev-btn"><i class="fas fa-step-backward"></i></button>
+        <button class="btn-control btn-play" id="play-btn"><i class="fas fa-play"></i></button>
+        <button class="btn-control" id="next-btn"><i class="fas fa-step-forward"></i></button>
+      </div>
+      <div class="progress-area">
+        <span class="time-text" id="curr-time">0:00</span>
+        <input type="range" id="progress-bar" value="0" min="0" step="0.1">
+        <span class="time-text" id="dur-time">0:00</span>
+      </div>
+    </div>
+
+    <div class="volume-area">
+      <i class="fas fa-volume-up" style="color:#aaa; font-size:0.8rem;"></i>
+      <input type="range" id="vol-slider" min="0" max="1" step="0.01" value="1">
+    </div>
+  </div>
+
+</div>
+
+<audio id="audio-player" crossorigin="anonymous"></audio>
+
+<script>
+/* --- CORE VARIABLES --- */
+const audio = document.getElementById('audio-player');
+let playlist = []; // Stores { file, title, artist, art }
+let currentIndex = 0;
+let isPlaying = false;
+const defaultArt = "https://static.wikia.nocookie.net/minecraft_gamepedia/images/8/86/Copper_Block_JE1_BE1.png";
+
+/* --- AUDIO CONTEXT (EQ) --- */
+let audioCtx, source, gainNode;
+let bassFilter, midFilter, trebleFilter;
+let isAudioCtxInit = false;
+
+function initAudioContext() {
+    if (isAudioCtxInit) return;
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    audioCtx = new AudioContext();
+    source = audioCtx.createMediaElementSource(audio);
+
+    // Create Filters
+    bassFilter = audioCtx.createBiquadFilter();
+    bassFilter.type = 'lowshelf';
+    bassFilter.frequency.value = 200;
+
+    midFilter = audioCtx.createBiquadFilter();
+    midFilter.type = 'peaking';
+    midFilter.frequency.value = 1000;
+    midFilter.Q.value = 1;
+
+    trebleFilter = audioCtx.createBiquadFilter();
+    trebleFilter.type = 'highshelf';
+    trebleFilter.frequency.value = 3000;
+
+    gainNode = audioCtx.createGain();
+
+    // Connect Chain: Source -> Bass -> Mid -> Treble -> Gain -> Output
+    source.connect(bassFilter);
+    bassFilter.connect(midFilter);
+    midFilter.connect(trebleFilter);
+    trebleFilter.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+
+    isAudioCtxInit = true;
+}
+
+/* --- UI ELEMENTS --- */
+const mainTitle = document.getElementById('main-title');
+const mainArtist = document.getElementById('main-artist');
+const mainArt = document.getElementById('main-art');
+const albumWrapper = document.getElementById('album-wrapper');
+
+const miniTitle = document.getElementById('mini-title');
+const miniArtist = document.getElementById('mini-artist');
+const miniArt = document.getElementById('mini-art');
+
+const playBtn = document.getElementById('play-btn');
+const progressBar = document.getElementById('progress-bar');
+const volSlider = document.getElementById('vol-slider');
+const queueList = document.getElementById('queue-list');
+
+/* --- FILE HANDLING & METADATA --- */
+document.getElementById('folder-upload').addEventListener('change', (e) => handleFiles(e.target.files));
+document.getElementById('file-upload').addEventListener('change', (e) => handleFiles(e.target.files));
+
+async function handleFiles(files) {
+    if (!isAudioCtxInit) initAudioContext(); // Initialize context on user action
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+
+    const newFiles = Array.from(files).filter(f => f.type.startsWith('audio/'));
+    if(newFiles.length === 0) return;
+
+    // Process each file (read metadata)
+    for (let file of newFiles) {
+        const metadata = await getMetadata(file);
+        playlist.push(metadata);
+    }
+
+    renderQueue();
+    // If this is the first upload, play the first track
+    if (playlist.length === newFiles.length) {
+        loadTrack(0);
+    }
+}
+
+function getMetadata(file) {
+    return new Promise((resolve) => {
+        jsmediatags.read(file, {
+            onSuccess: (tag) => {
+                const { title, artist, picture } = tag.tags;
+                let artUrl = defaultArt;
+                if (picture) {
+                    let base64 = "";
+                    for (let i = 0; i < picture.data.length; i++) {
+                        base64 += String.fromCharCode(picture.data[i]);
+                    }
+                    artUrl = `data:${picture.format};base64,${window.btoa(base64)}`;
+                }
+                resolve({
+                    file: file,
+                    url: URL.createObjectURL(file),
+                    title: title || file.name,
+                    artist: artist || "Unknown Artist",
+                    art: artUrl
+                });
+            },
+            onError: () => {
+                resolve({
+                    file: file,
+                    url: URL.createObjectURL(file),
+                    title: file.name,
+                    artist: "Unknown Artist",
+                    art: defaultArt
+                });
+            }
+        });
+    });
+}
+
+/* --- PLAYER LOGIC --- */
+function loadTrack(index) {
+    if (index >= playlist.length || index < 0) return;
+    currentIndex = index;
+    const track = playlist[index];
+
+    audio.src = track.url;
+
+    // Update UI
+    mainTitle.innerText = track.title;
+    mainArtist.innerText = track.artist;
+    mainArt.src = track.art;
+
+    miniTitle.innerText = track.title;
+    miniArtist.innerText = track.artist;
+    miniArt.src = track.art;
+
+    renderQueue(); // Update active state
+    playAudio();
+}
+
+function playAudio() {
+    if (!isAudioCtxInit) initAudioContext();
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+
+    audio.play().then(() => {
+        isPlaying = true;
+        playBtn.innerHTML = '<i class="fas fa-pause"></i>';
+        albumWrapper.classList.add('playing');
+    }).catch(e => console.log("Play interrupted", e));
+}
+
+function pauseAudio() {
+    audio.pause();
+    isPlaying = false;
+    playBtn.innerHTML = '<i class="fas fa-play"></i>';
+    albumWrapper.classList.remove('playing');
+}
+
+function togglePlay() {
+    if (playlist.length === 0) return;
+    if (isPlaying) pauseAudio();
+    else playAudio();
+}
+
+/* --- EVENTS --- */
+playBtn.addEventListener('click', togglePlay);
+document.getElementById('next-btn').addEventListener('click', () => loadTrack(currentIndex + 1));
+document.getElementById('prev-btn').addEventListener('click', () => loadTrack(currentIndex - 1));
+
+audio.addEventListener('timeupdate', () => {
+    if (isNaN(audio.duration)) return;
+    const pct = (audio.currentTime / audio.duration) * 100;
+    progressBar.value = audio.currentTime;
+    progressBar.max = audio.duration;
+
+    // Update CSS Variable for visual slider fill
+    progressBar.style.setProperty('--progress-percent', `${pct}%`);
+
+    document.getElementById('curr-time').innerText = formatTime(audio.currentTime);
+    document.getElementById('dur-time').innerText = formatTime(audio.duration);
+});
+
+audio.addEventListener('ended', () => loadTrack(currentIndex + 1));
+
+progressBar.addEventListener('input', () => {
+    audio.currentTime = progressBar.value;
+});
+
+volSlider.addEventListener('input', (e) => {
+    audio.volume = e.target.value;
+});
+
+/* --- EQ LOGIC --- */
+document.querySelectorAll('.eq-control').forEach(slider => {
+    slider.addEventListener('input', (e) => {
+        if (!isAudioCtxInit) return;
+        const val = parseFloat(e.target.value);
+        const type = e.target.getAttribute('data-type');
+
+        if (type === 'low') bassFilter.gain.value = val;
+        if (type === 'mid') midFilter.gain.value = val;
+        if (type === 'high') trebleFilter.gain.value = val;
+    });
+});
+
+/* --- QUEUE RENDERING --- */
+function renderQueue() {
+    queueList.innerHTML = '';
+    playlist.forEach((track, i) => {
+        const div = document.createElement('div');
+        div.className = `queue-item ${i === currentIndex ? 'active' : ''}`;
+        div.innerHTML = `
+            <img src="${track.art}">
+            <div class="q-info">
+                <div class="q-title">${track.title}</div>
+                <div class="q-artist">${track.artist}</div>
+            </div>
+        `;
+        div.onclick = () => loadTrack(i);
+        queueList.appendChild(div);
+    });
+}
+
+function formatTime(s) {
+    const min = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    return `${min}:${sec < 10 ? '0' : ''}${sec}`;
+}
+</script>
+
+</body>
+</html>
